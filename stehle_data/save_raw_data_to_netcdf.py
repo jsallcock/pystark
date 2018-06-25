@@ -3,11 +3,12 @@
 Created on Sat Feb 03 17:18:06 2018
 
 @author: jrh
-
 Edited by jsallcock 11/06/18
+
+Save the raw tabulated data for Stehle's Stark-broadened lineshape calculations as a netCDF file for easy python access.
 """
 
-import pystarky
+import pystark
 import os, fnmatch
 import re
 import numpy as np
@@ -32,14 +33,14 @@ def fort_conv(string):
 write_netcdf = True
 
 if write_netcdf:
-    ncf = netcdf.netcdf_file(pystarky.paths.netcdf_data_path, 'w')
+    ncf = netcdf.netcdf_file(pystark.paths.netcdf_data_path, 'w')
     ncf.createDimension('num', 1)
     ncf.createDimension('ten', 10)
     ncf.createDimension('max_d', 60)
 
 
 # path details for finding directories
-rdp = pystarky.paths.raw_data_path
+rdp = pystark.paths.raw_data_path
 
 ly_prefix, ly_n_l_lim, ly_n_u_lim = 'ly', 1, 30  # lyman
 ba_prefix, ba_n_l_lim, ba_n_u_lim = 'ba', 2, 30  # balmer
