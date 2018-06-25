@@ -16,22 +16,26 @@ Created on Sat Feb 03 17:18:06 2018
 #from scipy.optimize import curve_fit
 
 import numpy as np
-
+from scipy.constants import c, e, k
 import time
+import pystark
+
+
+
 
 def data_tables(n_upper,n_lower):
-    
-    
-            
+
     return tempe, olam0, N, NP, id_max, fainom, dense, f00, \
     dl12, dl12s, fainu, pr0, jtot, dom, d1om, o1line, o1lines
+
 
 def fort_conv(string):
     if bool(string.strip()):
         return np.float(string)
     else:
         return 0.0
-        
+
+
 def piksrt(N,inarr):
     # Sorting by straight insertion, from Nummerical Recipes
 
@@ -46,19 +50,20 @@ def piksrt(N,inarr):
             i = i-1
         arr[i+1] = a
     return arr
-    
+
+
 def FINTRP(x1,x2,x3,y1,y2,y3,x):
-    
+
 #    return np.interp(x,[x1,x2,x3],[y1,y2,y3])
-    
+
     if x == x2:
         return y2
-    
+
     a12=x1-x2
     a22=x1-x3
     v1=y1-y2
     v2=y1-y3
-    
+
     if ((y1 < y2) and (y2 < y3)) or ((y1 > y2) and (y2 > y3)):
         deter=v1*a22-v2*a12
         if np.abs(deter) < 1.0E-40:
@@ -81,7 +86,8 @@ def FINTRP(x1,x2,x3,y1,y2,y3,x):
         b=(-a21*v1+a11*v2)/deter
         c=y1-a*x1c-b*x1
         return (a*x+b)*x+c
-        
+
+
 def Voigt(x, amp, alpha, gamma):
     """
     Return the Voigt line shape at x with Lorentzian component HWHM gamma
@@ -98,15 +104,18 @@ def Voigt(x, amp, alpha, gamma):
 
     return amp*ans/np.max(ans)
 
-def stark_profile(n_upper,n_lower,temperature,density):
+
+def stark_profile(n_upper, n_lower, temperature, density):
+
+    print('pystark')
     
     start = time.time()
     
-    id_maxi = 30 # Maximum number of densities
-    max_d = 60 # Maximum number of detunings
+    id_maxi = 30  # Maximum number of densities
+    max_d = 60  # Maximum number of detunings
     
-    TEMP = temperature*11598.589518725807 # temperature in K
-    DENS = density*1.0E-6  # electronic density in cm-3
+    TEMP = temperature * e / k  # temperature in K
+    DENS = density * 1.0e-6  # electronic density in cm-3
     
     # ------------------------------------------------------------------------
     # Data tables
@@ -114,185 +123,208 @@ def stark_profile(n_upper,n_lower,temperature,density):
     if n_lower == 1:
         # Lyman series
         if n_upper == 2:
-            from stark_2_1_data import stark_2_1_data as sdata
+            from pystark.stark_2_1_data import stark_2_1_data as sdata
         if n_upper == 3:
-            from stark_3_1_data import stark_3_1_data as sdata
+            from pystark.stark_3_1_data import stark_3_1_data as sdata
         if n_upper == 4:
-            from stark_4_1_data import stark_4_1_data as sdata
+            from pystark.stark_4_1_data import stark_4_1_data as sdata
         if n_upper == 5:
-            from stark_5_1_data import stark_5_1_data as sdata
+            from pystark.stark_5_1_data import stark_5_1_data as sdata
         if n_upper == 6:
-            from stark_6_1_data import stark_6_1_data as sdata
+            from pystark.stark_6_1_data import stark_6_1_data as sdata
         if n_upper == 7:
-            from stark_7_1_data import stark_7_1_data as sdata
+            from pystark.stark_7_1_data import stark_7_1_data as sdata
         if n_upper == 8:
-            from stark_8_1_data import stark_8_1_data as sdata
+            from pystark.stark_8_1_data import stark_8_1_data as sdata
         if n_upper == 9:
-            from stark_9_1_data import stark_9_1_data as sdata
+            from pystark.stark_9_1_data import stark_9_1_data as sdata
         if n_upper == 10:
-            from stark_10_1_data import stark_10_1_data as sdata
+            from pystark.stark_10_1_data import stark_10_1_data as sdata
         if n_upper == 11:
-            from stark_11_1_data import stark_11_1_data as sdata
+            from pystark.stark_11_1_data import stark_11_1_data as sdata
         if n_upper == 12:
-            from stark_12_1_data import stark_12_1_data as sdata
+            from pystark.stark_12_1_data import stark_12_1_data as sdata
         if n_upper == 13:
-            from stark_13_1_data import stark_13_1_data as sdata
+            from pystark.stark_13_1_data import stark_13_1_data as sdata
         if n_upper == 14:
-            from stark_14_1_data import stark_14_1_data as sdata
+            from pystark.stark_14_1_data import stark_14_1_data as sdata
         if n_upper == 15:
-            from stark_15_1_data import stark_15_1_data as sdata
+            from pystark.stark_15_1_data import stark_15_1_data as sdata
         if n_upper == 16:
-            from stark_16_1_data import stark_16_1_data as sdata
+            from pystark.stark_16_1_data import stark_16_1_data as sdata
         if n_upper == 17:
-            from stark_17_1_data import stark_17_1_data as sdata
+            from pystark.stark_17_1_data import stark_17_1_data as sdata
         if n_upper == 18:
-            from stark_18_1_data import stark_18_1_data as sdata
+            from pystark.stark_18_1_data import stark_18_1_data as sdata
         if n_upper == 19:
-            from stark_19_1_data import stark_19_1_data as sdata
+            from pystark.stark_19_1_data import stark_19_1_data as sdata
         if n_upper == 20:
-            from stark_20_1_data import stark_20_1_data as sdata
+            from pystark.stark_20_1_data import stark_20_1_data as sdata
         if n_upper == 21:
-            from stark_21_1_data import stark_21_1_data as sdata
+            from pystark.stark_21_1_data import stark_21_1_data as sdata
         if n_upper == 22:
-            from stark_22_1_data import stark_22_1_data as sdata
+            from pystark.stark_22_1_data import stark_22_1_data as sdata
         if n_upper == 23:
-            from stark_23_1_data import stark_23_1_data as sdata
+            from pystark.stark_23_1_data import stark_23_1_data as sdata
         if n_upper == 24:
-            from stark_24_1_data import stark_24_1_data as sdata
+            from pystark.stark_24_1_data import stark_24_1_data as sdata
         if n_upper == 25:
-            from stark_25_1_data import stark_25_1_data as sdata
+            from pystark.stark_25_1_data import stark_25_1_data as sdata
         if n_upper == 26:
-            from stark_26_1_data import stark_26_1_data as sdata
+            from pystark.stark_26_1_data import stark_26_1_data as sdata
         if n_upper == 27:
-            from stark_27_1_data import stark_27_1_data as sdata
+            from pystark.stark_27_1_data import stark_27_1_data as sdata
         if n_upper == 28:
-            from stark_28_1_data import stark_28_1_data as sdata
+            from pystark.stark_28_1_data import stark_28_1_data as sdata
         if n_upper == 29:
-            from stark_29_1_data import stark_29_1_data as sdata
+            from pystark.stark_29_1_data import stark_29_1_data as sdata
         if n_upper == 30:
-            from stark_30_1_data import stark_30_1_data as sdata
+            from pystark.stark_30_1_data import stark_30_1_data as sdata
     if n_lower == 2:
         # Balmer series
         if n_upper == 3:    
-            from stark_3_2_data import stark_3_2_data as sdata
+            from pystark.stark_3_2_data import stark_3_2_data as sdata
         if n_upper == 4:
-            from stark_4_2_data import stark_4_2_data as sdata
+            from pystark.stark_4_2_data import stark_4_2_data as sdata
         if n_upper == 5:
-            from stark_5_2_data import stark_5_2_data as sdata
+            from pystark.stark_5_2_data import stark_5_2_data as sdata
         if n_upper == 6:
-            from stark_6_2_data import stark_6_2_data as sdata
+            from pystark.stark_6_2_data import stark_6_2_data as sdata
         if n_upper == 7:
-            from stark_7_2_data import stark_7_2_data as sdata
+            from pystark.stark_7_2_data import stark_7_2_data as sdata
         if n_upper == 8:
-            from stark_8_2_data import stark_8_2_data as sdata
+            from pystark.stark_8_2_data import stark_8_2_data as sdata
         if n_upper == 9:
-            from stark_9_2_data import stark_9_2_data as sdata
+            from pystark.stark_9_2_data import stark_9_2_data as sdata
         if n_upper == 10:
-            from stark_10_2_data import stark_10_2_data as sdata
+            from pystark.stark_10_2_data import stark_10_2_data as sdata
         if n_upper == 11:
-            from stark_11_2_data import stark_11_2_data as sdata
+            from pystark.stark_11_2_data import stark_11_2_data as sdata
         if n_upper == 12:
-            from stark_12_2_data import stark_12_2_data as sdata
+            from pystark.stark_12_2_data import stark_12_2_data as sdata
         if n_upper == 13:
-            from stark_13_2_data import stark_13_2_data as sdata
+            from pystark.stark_13_2_data import stark_13_2_data as sdata
         if n_upper == 14:
-            from stark_14_2_data import stark_14_2_data as sdata
+            from pystark.stark_14_2_data import stark_14_2_data as sdata
         if n_upper == 15:
-            from stark_15_2_data import stark_15_2_data as sdata
+            from pystark.stark_15_2_data import stark_15_2_data as sdata
         if n_upper == 16:
-            from stark_16_2_data import stark_16_2_data as sdata
+            from pystark.stark_16_2_data import stark_16_2_data as sdata
         if n_upper == 17:
-            from stark_17_2_data import stark_17_2_data as sdata
+            from pystark.stark_17_2_data import stark_17_2_data as sdata
         if n_upper == 18:
-            from stark_18_2_data import stark_18_2_data as sdata
+            from pystark.stark_18_2_data import stark_18_2_data as sdata
         if n_upper == 19:
-            from stark_19_2_data import stark_19_2_data as sdata
+            from pystark.stark_19_2_data import stark_19_2_data as sdata
         if n_upper == 20:
-            from stark_20_2_data import stark_20_2_data as sdata
+            from pystark.stark_20_2_data import stark_20_2_data as sdata
         if n_upper == 21:
-            from stark_21_2_data import stark_21_2_data as sdata
+            from pystark.stark_21_2_data import stark_21_2_data as sdata
         if n_upper == 22:
-            from stark_22_2_data import stark_22_2_data as sdata
+            from pystark.stark_22_2_data import stark_22_2_data as sdata
         if n_upper == 23:
-            from stark_23_2_data import stark_23_2_data as sdata
+            from pystark.stark_23_2_data import stark_23_2_data as sdata
         if n_upper == 24:
-            from stark_24_2_data import stark_24_2_data as sdata
+            from pystark.stark_24_2_data import stark_24_2_data as sdata
         if n_upper == 25:
-            from stark_25_2_data import stark_25_2_data as sdata
+            from pystark.stark_25_2_data import stark_25_2_data as sdata
         if n_upper == 26:
-            from stark_26_2_data import stark_26_2_data as sdata
+            from pystark.stark_26_2_data import stark_26_2_data as sdata
         if n_upper == 27:
-            from stark_27_2_data import stark_27_2_data as sdata
+            from pystark.stark_27_2_data import stark_27_2_data as sdata
         if n_upper == 28:
-            from stark_28_2_data import stark_28_2_data as sdata
+            from pystark.stark_28_2_data import stark_28_2_data as sdata
         if n_upper == 29:
-            from stark_29_2_data import stark_29_2_data as sdata
+            from pystark.stark_29_2_data import stark_29_2_data as sdata
         if n_upper == 30:
-            from stark_30_2_data import stark_30_2_data as sdata
+            from pystark.stark_30_2_data import stark_30_2_data as sdata
     if n_lower == 3:
         # Paschen series
         if n_upper == 4:
-            from stark_4_3_data import stark_4_3_data as sdata
+            from pystark.stark_4_3_data import stark_4_3_data as sdata
         if n_upper == 5:
-            from stark_5_3_data import stark_5_3_data as sdata
+            from pystark.stark_5_3_data import stark_5_3_data as sdata
         if n_upper == 6:
-            from stark_6_3_data import stark_6_3_data as sdata
+            from pystark.stark_6_3_data import stark_6_3_data as sdata
         if n_upper == 7:
-            from stark_7_3_data import stark_7_3_data as sdata
+            from pystark.stark_7_3_data import stark_7_3_data as sdata
         if n_upper == 8:
-            from stark_8_3_data import stark_8_3_data as sdata
+            from pystark.stark_8_3_data import stark_8_3_data as sdata
         if n_upper == 9:
-            from stark_9_3_data import stark_9_3_data as sdata
+            from pystark.stark_9_3_data import stark_9_3_data as sdata
         if n_upper == 10:
-            from stark_10_3_data import stark_10_3_data as sdata
+            from pystark.stark_10_3_data import stark_10_3_data as sdata
         if n_upper == 11:
-            from stark_11_3_data import stark_11_3_data as sdata
+            from pystark.stark_11_3_data import stark_11_3_data as sdata
         if n_upper == 12:
-            from stark_12_3_data import stark_12_3_data as sdata
+            from pystark.stark_12_3_data import stark_12_3_data as sdata
         if n_upper == 13:
-            from stark_13_3_data import stark_13_3_data as sdata
+            from pystark.stark_13_3_data import stark_13_3_data as sdata
         if n_upper == 14:
-            from stark_14_3_data import stark_14_3_data as sdata
+            from pystark.stark_14_3_data import stark_14_3_data as sdata
         if n_upper == 15:
-            from stark_15_3_data import stark_15_3_data as sdat
+            from pystark.stark_15_3_data import stark_15_3_data as sdata
         if n_upper == 16:
-            from stark_16_3_data import stark_16_3_data as sdata
+            from pystark.stark_16_3_data import stark_16_3_data as sdata
         if n_upper == 17:
-            from stark_17_3_data import stark_17_3_data as sdata
+            from pystark.stark_17_3_data import stark_17_3_data as sdata
         if n_upper == 18:
-            from stark_18_3_data import stark_18_3_data as sdata
+            from pystark.stark_18_3_data import stark_18_3_data as sdata
         if n_upper == 19:
-            from stark_19_3_data import stark_19_3_data as sdata
+            from pystark.stark_19_3_data import stark_19_3_data as sdata
         if n_upper == 20:
-            from stark_20_3_data import stark_20_3_data as sdata
+            from pystark.stark_20_3_data import stark_20_3_data as sdata
         if n_upper == 21:
-            from stark_21_3_data import stark_21_3_data as sdata
+            from pystark.stark_21_3_data import stark_21_3_data as sdata
         if n_upper == 22:
-            from stark_22_3_data import stark_22_3_data as sdata
+            from pystark.stark_22_3_data import stark_22_3_data as sdata
         if n_upper == 23:
-            from stark_23_3_data import stark_23_3_data as sdata
+            from pystark.stark_23_3_data import stark_23_3_data as sdata
         if n_upper == 24:
-            from stark_24_3_data import stark_24_3_data as sdata
+            from pystark.stark_24_3_data import stark_24_3_data as sdata
         if n_upper == 25:
-            from stark_25_3_data import stark_25_3_data as sdata
+            from pystark.stark_25_3_data import stark_25_3_data as sdata
         if n_upper == 26:
-            from stark_26_3_data import stark_26_3_data as sdata
+            from pystark.stark_26_3_data import stark_26_3_data as sdata
         if n_upper == 27:
-            from stark_27_3_data import stark_27_3_data as sdata
+            from pystark.stark_27_3_data import stark_27_3_data as sdata
         if n_upper == 28:
-            from stark_28_3_data import stark_28_3_data as sdata
+            from pystark.stark_28_3_data import stark_28_3_data as sdata
         if n_upper == 29:
-            from stark_29_3_data import stark_29_3_data as sdata
+            from pystark.stark_29_3_data import stark_29_3_data as sdata
         if n_upper == 30:
-            from stark_30_3_data import stark_30_3_data as sdata
+            from pystark.stark_30_3_data import stark_30_3_data as sdata
 
     
     tempe, olam0, N, NP, id_max, fainom, dense, f00, dl12, dl12s, fainu, pr0, \
     jtot, dom, d1om, o1line, o1lines = sdata()
+
+    load_time = time.time() - start
+    print('load_time:', load_time)
+
+    # tempe     - electron temperature (K)
+    # olam0     - line centre wavlength (A)
+    # N         - lower principal quantum number
+    # NP        - upper principal quantum number
+    # id_max    -
+    # fainom    -
+    # dense     - electron density (cm ** -3)
+    # f00       - normal Holtsmark field strength (30 kV / m)
+    # dl12      -
+    # dl12s     -
+    # fainu     - Asymptotic value of iStark * (alpha ** 2.5)
+    # pr0       - Ratio of the mean interelectronic distance to the electronic Debye length
+    # jtot      -
+    # dom       -
+    # d1om      -
+    # o1line    -
+    # o1lines   -
+
+    jtot = jtot.astype(np.int)
     
     #dom = np.zeros([id_maxi,10,max_d])
-    oline = np.zeros([id_maxi,10,max_d])
-    olines = np.zeros([id_maxi,10,max_d])
+    oline = np.zeros([id_maxi, 10, max_d])
+    olines = np.zeros([id_maxi, 10, max_d])
     
     #d1om = np.zeros([id_maxi,10,max_d])
     #o1line = np.zeros([id_maxi,10,max_d])
@@ -300,17 +332,16 @@ def stark_profile(n_upper,n_lower,temperature,density):
     
     domm = np.zeros(100000)
     dom0 = np.zeros(10000)
-    tprof = np.zeros([id_maxi,10,10000])
-    tprofs = np.zeros([id_maxi,10,10000])
-    uprof = np.zeros([id_maxi,10000])
-    uprofs = np.zeros([id_maxi,10000])
-        
-    OPI=3.1415926536E00
-    cspeed=2.9979E18 # velocity of light in Ansgtroms/s
-    cspeed_pi=2.0*OPI*cspeed
+    tprof = np.zeros([id_maxi, 10, 10000])
+    tprofs = np.zeros([id_maxi, 10, 10000])
+    uprof = np.zeros([id_maxi, 10000])
+    uprofs = np.zeros([id_maxi, 10000])
+
+    cspeed = c * 1e10  # velocity of light in Ansgtroms/s
+    cspeed_pi = 2.0 * np.pi * cspeed
     
-    PR0_exp= 0.0898*(DENS**(1./6.))/np.sqrt(TEMP) #=(r0/debye)
-    F00_exp=1.25E-9*(DENS**(2./3.)) # normal field value in ues
+    PR0_exp = 0.0898 * (DENS ** (1./6.))/ np.sqrt(TEMP) #=(r0/debye)
+    F00_exp = 1.25E-9 * (DENS ** (2./3.))  # normal field value in ues
     
     ON=N
     ONP=NP
@@ -368,12 +399,12 @@ def stark_profile(n_upper,n_lower,temperature,density):
     for id in np.arange(id_max+1):
         for j in np.arange(10):
             #print 'jtot[id,j]',jtot[id,j]
-            for i in np.arange(1,jtot[id,j]):
+            for i in np.arange(1, jtot[id, j]):
                 inc=inc+1
-                dom0[inc]=dom[id,j,i]
+                dom0[inc] = dom[id,j,i]
     
     inc = np.count_nonzero(dom)
-    npik=inc+1
+    npik = inc + 1
     #nut=10000
     
     # Calling numpy sort instead of piksrt
@@ -395,7 +426,7 @@ def stark_profile(n_upper,n_lower,temperature,density):
         inc = inc+1
         domm[inc] = dom0[i]
         
-    jdom = inc+1 # One line after marker 35
+    jdom = inc + 1  # One line after marker 35
     
     for id in np.arange(id_max):
         for j in np.arange(10):
@@ -504,7 +535,7 @@ def stark_profile(n_upper,n_lower,temperature,density):
         dense1 = dense[id_max-1]
         dense2 = dense[id_max]
         id1 = id_max-1
-        id2 =id_max
+        id2 = id_max
         
     for it in np.arange(10):
         otest = (TEMP-tempe[it])*(TEMP-tempe[it+1])
@@ -522,8 +553,8 @@ def stark_profile(n_upper,n_lower,temperature,density):
     # interpolation in temperature          
     for id in np.arange(id1,id2+1):
         for i in np.arange(jdom):
-            uprof[id,i]=tprof[id,it1,i]+(TEMP-tempe1)*(tprof[id,it2,i]-tprof[id,it1,i])/(tempe2-tempe1)
-            uprofs[id,i]=tprofs[id,it1,i]+(TEMP-tempe1)*(tprofs[id,it2,i]-tprofs[id,it1,i])/(tempe2-tempe1)
+            uprof[id,i] = tprof[id,it1,i] + (TEMP-tempe1) * (tprof[id,it2,i]-tprof[id,it1,i]) / (tempe2-tempe1)
+            uprofs[id,i] = tprofs[id,it1,i] + (TEMP-tempe1) * (tprofs[id,it2,i]-tprofs[id,it1,i]) / (tempe2-tempe1)
             #print 'id,i:',id,i
             #print 'tprof[id,it,i]:',tprof[id,it,i]
             #print 'uprof[id,i]:',uprof[id,i]
@@ -553,10 +584,10 @@ def stark_profile(n_upper,n_lower,temperature,density):
         wprof=uprof[id1,i]+(DENS-dense1)*(uprof[id2,i]-uprof[id1,i])/(dense2-dense1)
         wprofs=uprofs[id1,i]+(DENS-dense1)*(uprofs[id2,i]-uprofs[id1,i])/(dense2-dense1)
         delta_omega=domm[i]*F00_exp
-        delta_nu[i]=delta_omega/(2*OPI)
+        delta_nu[i]=delta_omega/(2 * np.pi)
         delta_lambda[i]= ambda*delta_omega/(omega + delta_omega)
-        wprof_nu[i]=(wprof/F00_exp)*(2.*OPI)
-        wprofs_nu[i]=(wprofs/F00_exp)*(2.*OPI)
+        wprof_nu[i]=(wprof/F00_exp)*(2. * np.pi)
+        wprofs_nu[i]=(wprofs/F00_exp)*(2. * np.pi)
 #        print '%e %e %e %e' %(delta_lambda[i],delta_nu[i],wprof_nu[i],wprofs_nu[i])
         
     delta_lambda2 = np.concatenate((-delta_lambda[::-1],delta_lambda)) + olam0
@@ -566,36 +597,37 @@ def stark_profile(n_upper,n_lower,temperature,density):
     
     end = time.time()
     
-    print 'Time elapsed (s): ',end-start
+    print('Time elapsed (s): ',end-start)
     
-    return delta_lambda2,wprof_nu2,wprofs_nu2
-    
+    return delta_lambda2, wprof_nu2, wprofs_nu2
+
+
 if __name__ == '__main__':        
     
-    x,y,ys = stark_profile(4,3,0.8621738,1.0E20)
+    x, y, ys = stark_profile(2, 1, 8.621738, 1.0E20)
     
     olam0 = np.mean(x)
     
     # Read output from the fortran code
     #f77res = np.loadtxt('C:/Temp/98A/ba/ba08/fort.74',skiprows=5)
-    f77res = np.loadtxt('C:/Temp/98A/pa/pa04/fort.74',skiprows=5)
+    # f77res = np.loadtxt('C:/Temp/98A/pa/pa04/fort.74',skiprows=5)
     
     import matplotlib.pyplot as plt
     plt.figure()
-    plt.plot(x,y,'.-b')
-    plt.plot(olam0+f77res[:,0],f77res[:,2],'x-r')
-    plt.legend(['PyStark','Fortran'])
+    plt.plot(x, y, '.-b')
+    # plt.plot(olam0+f77res[:,0],f77res[:,2],'x-r')
+    # plt.legend(['PyStark','Fortran'])
     
     #fit = curve_fit(Voigt,delta_lambda2,wprof_nu2)
-    
-    
+
     #plt.plot(delta_lambda2,Voigt(delta_lambda2,2.52E-11,0.235,0.03),'g')
     #xdat = np.linspace(-2.0,2.0,150)
     #plt.plot(xdat,Voigt(xdat,fit[0][0],fit[0][1],fit[0][2]),'g')
-    plt.xlim(olam0+np.array([-2.0,2.0]))
+    plt.xlim(olam0 + np.array([-30.0, 30.0]))
     
     #diff = 100.0*np.abs(y-f77res[:,2])/f77res[:,2]
     #plt.figure()
     #plt.plot(f77res[:,1],diff)
     #plt.xlim([0.0,1.0])
-    #plt.show()
+    plt.xlabel('wavelength (A)')
+    plt.show()
