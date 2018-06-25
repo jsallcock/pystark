@@ -1,0 +1,9 @@
+           N LOWER =  1  N UPPER=  6  WAVELENGTH (angstroms)=   915.34
+                electronic density(1/cm**3)       1.000E+10
+                conversion factor for wlengths=f0 5.808E-03
+                wings factor                  =   4.950E-03
+ temperatures, line index : beginning - end
+T1 T2,T3  10  36
+T4,T5,T6  43  71
+T7,T8,T9  78 110
+     T10 117 148
