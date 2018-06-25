@@ -13,7 +13,7 @@ from matplotlib.colors import LogNorm
 nc = netcdf.netcdf_file(pystarky.paths.netcdf_data_path, 'r')
 
 
-def stehle_profile(n_upper, n_lower, temperature, density, spectrum='wavelength'):
+def stehle_profile(n_upper, n_lower, temperature, density):
     """  Stark-broadened lineshape.
     
     :param n_upper: upper principal quantum number
@@ -21,7 +21,7 @@ def stehle_profile(n_upper, n_lower, temperature, density, spectrum='wavelength'
     :param temperature: in eV
     :param density: in m ** -3
     
-    :return: 
+    :return: wl_axis, lineshape_m, wprofs_nu2
     """
 
     # print('pystarky')

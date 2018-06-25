@@ -33,14 +33,14 @@ def fort_conv(string):
 write_netcdf = True
 
 if write_netcdf:
-    ncf = netcdf.netcdf_file(pystark.paths.netcdf_data_path, 'w')
+    ncf = netcdf.netcdf_file(pystark.paths.stehle_netcdf_file_path, 'w')
     ncf.createDimension('num', 1)
     ncf.createDimension('ten', 10)
     ncf.createDimension('max_d', 60)
 
 
 # path details for finding directories
-rdp = pystark.paths.raw_data_path
+rdp = pystark.paths.stehle_raw_data_path
 
 ly_prefix, ly_n_l_lim, ly_n_u_lim = 'ly', 1, 30  # lyman
 ba_prefix, ba_n_l_lim, ba_n_u_lim = 'ba', 2, 30  # balmer
