@@ -29,7 +29,6 @@ def fort_conv(string):
         return 0.0
 
 
-
 write_netcdf = True
 
 if write_netcdf:
@@ -92,7 +91,7 @@ for transition in range(0, transition_num):
     tprofs = np.zeros([id_maxi,10,10000])
     dense = np.zeros(id_maxi)
     f00 = np.zeros(id_maxi)
-    pr0 = np.zeros([id_maxi,10])
+    pr0 = np.zeros([id_maxi, 10])
     uprof = np.zeros([id_maxi,10000])
     uprofs = np.zeros([id_maxi,10000])
 
@@ -403,16 +402,16 @@ for transition in range(0, transition_num):
             for i in np.arange(int(jtot[id,j])):
                 #print 'i,j,jtot[id,j]',i,j,jtot[id,j]
                 # detunings for 1-np transition (alfa, omega, lambda units)
-                dalfa=din[j,i]
-                dlambda=f00[id]*dalfa   # angstroms
-                domega= -C_SPEED_PI * dlambda / ((ambda + dlambda) * ambda) #rd/s
-                dom[id,j,i]=domega/f00[id] # (rd/(s*ues)
-                dom[id,j,i]=np.abs(dom[id,j,i])
-                otrans= -C_SPEED_PI / (ambda * ambda)
+                dalfa = din[j,i]
+                dlambda = f00[id]*dalfa   # angstroms
+                domega = - C_SPEED_PI * dlambda / ((ambda + dlambda) * ambda) #rd/s
+                dom[id,j,i] = domega/f00[id]  # (rd/(s*ues)
+                dom[id,j,i] = np.abs(dom[id,j,i])
+                otrans = -C_SPEED_PI / (ambda * ambda)
 
-                o1lines[id,j,i]=sprofs[j,i]
+                o1lines[id,j,i] = sprofs[j,i]
                 o1line[id,j,i] = sprof[j,i]
-                d1om[id,j,i]   =din[j,i]
+                d1om[id,j,i] = din[j,i]
 
                 olines[id,j,i]=sprofs[j,i]/np.abs(otrans)
                 oline[id,j,i] =sprof[j,i]/np.abs(otrans)
@@ -465,57 +464,6 @@ for transition in range(0, transition_num):
         for wr_str, wr_var, wr_type, wr_dim in zip(wr_strs, wr_vars, wr_types, wr_dims):
             variable = ncf.createVariable(prefix + wr_str, wr_type, wr_dim)
             variable[:] = wr_var
-
-        # N_write = ncf.createVariable(prefix + 'N', 'i', ('num',))
-        # N_write[:] = N
-        # NP_write = ncf.createVariable(prefix + 'NP', 'd', ('num',))
-        # NP_write[:] = NP
-        # id_maxi_write = ncf.createVariable(prefix + 'id_maxi', 'd', ('num',))
-        # id_maxi_write[:] = 30
-        # max_d_write = ncf.createVariable(prefix+'max_d', 'd', ('num',))
-        # max_d_write[:] = 60
-        # id_max_write = ncf.createVariable(prefix+'id_max', 'd', ('num',))
-        # id_max_write[:] = id_max
-        # olam0_write = ncf.createVariable(prefix+'olam0', 'd', ('num',))
-        # olam0_write[:] = olam0
-        # fainom_write = ncf.createVariable(prefix+'fainom', 'd', ('num',))
-        # fainom_write[:] = fainom
-        # fainu_write = ncf.createVariable(prefix+'fainu', 'd', ('num',))
-        # fainu_write[:] = fainu
-        #
-        # dense_write = ncf.createVariable(prefix+'dense','d',(prefix+'id_maxi',))
-        # dense_write[:] = dense
-        #
-        # tempe_write = ncf.createVariable(prefix+'tempe','d',('ten',))
-        # tempe_write[:] = tempe
-        #
-        # f00_write = ncf.createVariable(prefix+'f00','d',(prefix + 'id_maxi',))
-        # f00_write[:] = f00
-        #
-        # dl12_write = ncf.createVariable(prefix+'dl12','d',('ten',))
-        # dl12_write[:] = dl12
-        #
-        # dl12s_write = ncf.createVariable(prefix+'dl12s','d',('ten',))
-        # dl12s_write[:] = dl12s
-        #
-        # pr0_write = ncf.createVariable(prefix+'pr0','d',(prefix+'id_maxi','ten',))
-        # pr0_write[:] = pr0
-        #
-        # jtot_write = ncf.createVariable(prefix+'jtot','d',(prefix+'id_maxi','ten',))
-        # jtot_write[:] = jtot
-        #
-        # dom_write = ncf.createVariable(prefix+'dom','d',(prefix+'id_maxi','ten','max_d',))
-        # dom_write[:] = dom
-        #
-        # d1om_write = ncf.createVariable(prefix+'d1om','d',(prefix+'id_maxi','ten','max_d',))
-        # d1om_write[:] = d1om
-        #
-        # o1lines_write = ncf.createVariable(prefix+'o1lines','d',(prefix+'id_maxi','ten','max_d',))
-        # o1lines_write[:] = o1lines
-        #
-        # o1line_write = ncf.createVariable(prefix+'o1line','d',(prefix+'id_maxi','ten','max_d',))
-        # o1line_write[:] = o1line
-
 
 
 if write_netcdf:

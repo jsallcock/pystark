@@ -15,19 +15,21 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     :return: wl_axis, lineshape_m, wprofs_nu2
     """
 
-    start = time.time()
+    # ensure given n_upper + n_lower fall within tabulated values
     assert n_lower in range(1, 4)
     assert n_upper in range(n_lower + 1, 31)
 
+    temp_k = temperature * e / k  # temperature in K
+    dens_cm = density * 1.e-6  # electronic density in cm-3
     prefix = 'n_' + str(n_upper) + '_' + str(n_lower) + '_'
 
-    # extract raw_data
-    tempe = np.array(pystark.nc.variables[prefix + 'tempe'].data)  # electron temperature (K)
+    # extract raw tabulated data
+    tab_temp_k = np.array(pystark.nc.variables[prefix + 'tempe'].data)  # tabulated electron temperatures (K)
     olam0 = pystark.nc.variables[prefix + 'olam0'].data  # line centre wavlength (A)
     id_max = pystark.nc.variables[prefix + 'id_max'].data
     fainom = pystark.nc.variables[prefix + 'fainom'].data
-    dense = np.array(pystark.nc.variables[prefix + 'dense'].data)  # electron density (cm ** -3)
-    f00 = np.array(pystark.nc.variables[prefix + 'f00'].data)      #  normal Holtsmark field strength (30 kV / m)
+    tab_dens_cm = np.array(pystark.nc.variables[prefix + 'dense'].data)  # tabulated electron densities  (cm ** -3)
+    f00 = np.array(pystark.nc.variables[prefix + 'f00'].data)      # normal Holtsmark field strength (30 kV / m)
     dl12 = np.array(pystark.nc.variables[prefix + 'dl12'].data)
     dl12s = np.array(pystark.nc.variables[prefix + 'dl12s'].data)
     fainu = pystark.nc.variables[prefix + 'fainu'].data  # Asymptotic value of iStark * (alpha ** 2.5) ("wings factor in alfa units")
@@ -38,43 +40,40 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     o1line = np.array(pystark.nc.variables[prefix + 'o1line'].data)
     o1lines = np.array(pystark.nc.variables[prefix + 'o1lines'].data)
 
-    load_time = time.time() - start
-    # print('load_time:', load_time)
+    # ensure given temperature + density falls within tabulated values
+    if dens_cm >= 2.0 * tab_dens_cm[id_max]:
+        raise Exception('Your input density is higher than the largest tabulated value %f' % tab_dens_cm[id_max])
 
-    id_maxi = 30  # Maximum number of densities
-    max_d = 60  # Maximum number of detunings
+    if dens_cm <= tab_dens_cm[0]:
+        raise Exception('Your input density is smaller than the smallest tabulated value %f' % tab_dens_cm[0])
 
-    TEMP = temperature * e / k  # temperature in K
-    DENS = density * 1.e-6  # electronic density in cm-3
+    if temp_k >= tab_temp_k[9]:
+        raise Exception('Your input temperature is higher than the largest tabulated value %f' % tab_temp_k[9])
 
-    jtot = jtot.astype(np.int)
+    if temp_k <= tab_temp_k[0]:
+        raise Exception('Your input temperature is lower than the smallest tabulated value %f' % tab_temp_k[0])
 
-    domm = np.zeros(100000)
-    dom0 = np.zeros(10000)
-    tprof = np.zeros([id_maxi, 10, 10000])
-    tprofs = np.zeros([id_maxi, 10, 10000])
-    uprof = np.zeros([id_maxi, 10000])
-    uprofs = np.zeros([id_maxi, 10000])
+    normal_holtsmark_field = 1.25e-9 * (dens_cm ** (2. / 3.))  # normal field value in ues
 
-    cspeed = c * 1e10  # velocity of light in Ansgtroms/s
-    cspeed_pi = 2 * np.pi * cspeed
+    # calculate line centre wavelength and frequency using Rydberg formula
+    # JSA: I have made this step clearer and corrected for deuteron mass in the Rydberg constant (though the effect is small)
+    # TODO make sure this matches olam0 parameter above -- why were there two variables in the first place?!
+    rydberg_m = Rydberg / (1. + (electron_mass / physical_constants['deuteron mass'][0]))
+    wl_0_angst = 1e10 * (rydberg_m * (1 / n_lower ** 2 - 1 / n_upper ** 2)) ** -1
 
-    PR0_exp = 0.0898 * (DENS ** (1. / 6.)) / np.sqrt(TEMP)  # =(r0/debye)
-    F00_exp = 1.25E-9 * (DENS ** (2. / 3.))  # normal field value in ues
+    c_angst = c * 1e10  # velocity of light in Ansgtroms / s
+    angular_freq_0 = 2 * np.pi * c_angst/ wl_0_angst  # rad / s
 
-    ON = n_lower
-    ONP = n_upper
-    # DNU=1.0/ON**2 - 1.0/ONP**2
-    ambda = 911.7633455 * (ON * ONP) ** 2 / ((ONP - ON) * (ONP + ON))
-
-    omega = cspeed_pi / ambda
-    otrans = -cspeed_pi / (ambda * ambda)
+    otrans = -2 * np.pi * c_angst / wl_0_angst ** 2
 
     olines = o1lines / np.abs(otrans)
     oline = o1line / np.abs(otrans)
 
+    # Limit analysis to uncorrelated plasmas.
+    # check that mean interelectronic distance is smaller than the electronic Debye length (equ. 10)
+    PR0_exp = 0.0898 * (dens_cm ** (1. / 6.)) / np.sqrt(temp_k)  # = (r0 / debye)
     if PR0_exp > 1.:
-        raise Exception('The plasma is too strongly correlated\ni.e. r0/debye=0.1\nthe line cannot be computed presently')
+        raise Exception('The plasma is too strongly correlated\ni.e. r0/debye=0.1\nthe line cannot be computed.')
 
     # fainom_exp=fainom*(F00_exp**1.5)
     # fainum_exp=fainom_exp/( (OPI*2.)**1.5)
@@ -98,12 +97,12 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     # change sligtly the value of the input density
     # DENS in order to remain , as far as possible, inside the tabulation
 
-    if np.abs(DENS - dense[0]) / DENS <= 1.0E-3:
-        DENS = dense[0] * 1.001
+    if np.abs(dens_cm - tab_dens_cm[0]) / dens_cm <= 1.0E-3:
+        dens_cm = tab_dens_cm[0] * 1.001
 
     for id in np.arange(1, id_max + 1):
-        if np.abs(DENS - dense[id]) / DENS <= 1.0E-3:
-            DENS = dense[id] * 0.999
+        if np.abs(dens_cm - tab_dens_cm[id]) / dens_cm <= 1.0E-3:
+            dens_cm = tab_dens_cm[id] * 0.999
 
     # ==============================================
     # define an unique detunings grid - domm -  for the tabulated
@@ -112,12 +111,22 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     # units used at this points are Domega_new= Delta(omega)/F00
     #                                      in rd/(s-1 ues)
 
+    id_maxi = 30  # Maximum number of densities
+    max_d = 60  # Maximum number of detunings
+    jtot = jtot.astype(np.int)
+    domm = np.zeros(100000)
+    dom0 = np.zeros(10000)
+    tprof = np.zeros([id_maxi, 10, 10000])
+    tprofs = np.zeros([id_maxi, 10, 10000])
+    uprof = np.zeros([id_maxi, 10000])
+    uprofs = np.zeros([id_maxi, 10000])
+
+
     inc = 0
     domm[inc] = 0.0
     # ---- Look to replace this loop
     for id in np.arange(id_max + 1):
         for j in np.arange(10):
-            # print 'jtot[id,j]',jtot[id,j]
             for i in np.arange(1, jtot[id, j]):
                 inc = inc + 1
                 dom0[inc] = dom[id, j, i]
@@ -228,49 +237,38 @@ def stehle_profile(n_upper, n_lower, temperature, density):
 
     # We can skip writing the intermediate file
 
-    if DENS >= 2.0 * dense[id_max]:
-        raise Exception('Your input density is higher than the largest tabulated value %f' % dense[id_max])
-
-    if DENS <= dense[0]:
-        raise Exception('Your input density is smaller than the smallest tabulated value %f' % dense[0])
-
-    if TEMP >= tempe[9]:
-        raise Exception('Your input temperature is higher than the largest tabulated value %f' % tempe[9])
-
-    if TEMP <= tempe[0]:
-        raise Exception('Your input temperature is lower than the smallest tabulated value %f' % tempe[0])
 
     for id in np.arange(id_max):
-        otest_dens = (DENS - dense[id]) * (DENS - dense[id + 1])
+        otest_dens = (dens_cm - tab_dens_cm[id]) * (dens_cm - tab_dens_cm[id + 1])
         if otest_dens <= 0.0:
-            dense1 = dense[id]
-            dense2 = dense[id + 1]
+            dense1 = tab_dens_cm[id]
+            dense2 = tab_dens_cm[id + 1]
             id1 = id
             id2 = id + 1
             break
 
-    if DENS >= dense[id_max]:
-        dense1 = dense[id_max - 1]
-        dense2 = dense[id_max]
+    if dens_cm >= tab_dens_cm[id_max]:
+        dense1 = tab_dens_cm[id_max - 1]
+        dense2 = tab_dens_cm[id_max]
         id1 = id_max - 1
         id2 = id_max
 
     for it in np.arange(10):
-        otest = (TEMP - tempe[it]) * (TEMP - tempe[it + 1])
+        otest = (temp_k - tab_temp_k[it]) * (temp_k - tab_temp_k[it + 1])
         if otest <= 0.0:
             it1 = it
             it2 = it + 1
             # pr01 = pr0[id2,it1] # max value of pr0 for T1,T2,dense1,dense2
-            tempe1 = tempe[it]
-            tempe2 = tempe[it + 1]
+            tempe1 = tab_temp_k[it]
+            tempe2 = tab_temp_k[it + 1]
             break
 
     # interpolation in temperature
     for id in np.arange(id1, id2 + 1):
         for i in np.arange(jdom):
-            uprof[id, i] = tprof[id, it1, i] + (TEMP - tempe1) * (tprof[id, it2, i] - tprof[id, it1, i]) / (
+            uprof[id, i] = tprof[id, it1, i] + (temp_k - tempe1) * (tprof[id, it2, i] - tprof[id, it1, i]) / (
             tempe2 - tempe1)
-            uprofs[id, i] = tprofs[id, it1, i] + (TEMP - tempe1) * (tprofs[id, it2, i] - tprofs[id, it1, i]) / (
+            uprofs[id, i] = tprofs[id, it1, i] + (temp_k - tempe1) * (tprofs[id, it2, i] - tprofs[id, it1, i]) / (
             tempe2 - tempe1)
 
     delta_lambda = np.zeros(jdom)
@@ -279,14 +277,14 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     wprofs_nu = np.zeros(jdom)
 
     for i in np.arange(jdom):
-        wprof = uprof[id1, i] + (DENS - dense1) * (uprof[id2, i] - uprof[id1, i]) / (dense2 - dense1)
-        wprofs = uprofs[id1, i] + (DENS - dense1) * (uprofs[id2, i] - uprofs[id1, i]) / (dense2 - dense1)
-        delta_omega = domm[i] * F00_exp
+        wprof = uprof[id1, i] + (dens_cm - dense1) * (uprof[id2, i] - uprof[id1, i]) / (dense2 - dense1)
+        wprofs = uprofs[id1, i] + (dens_cm - dense1) * (uprofs[id2, i] - uprofs[id1, i]) / (dense2 - dense1)
+        delta_omega = domm[i] * normal_holtsmark_field
         delta_nu[i] = delta_omega / (2 * np.pi)
-        delta_lambda[i] = ambda * delta_omega / (omega + delta_omega)
+        delta_lambda[i] = wl_0_angst * delta_omega / (angular_freq_0 + delta_omega)
         # print(delta_lambda[i])
-        wprof_nu[i] = (wprof / F00_exp) * (2. * np.pi)
-        wprofs_nu[i] = (wprofs / F00_exp) * (2. * np.pi)
+        wprof_nu[i] = (wprof / normal_holtsmark_field) * (2. * np.pi)
+        wprofs_nu[i] = (wprofs / normal_holtsmark_field) * (2. * np.pi)
         #        print '%e %e %e %e' %(delta_lambda[i],delta_nu[i],wprof_nu[i],wprofs_nu[i])
 
     delta_lambda2 = np.concatenate((-delta_lambda[::-1], delta_lambda)) + olam0
@@ -294,8 +292,8 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     wprof_nu2 = np.concatenate((wprof_nu[::-1], wprof_nu))
     wprofs_nu2 = np.concatenate((wprofs_nu[::-1], wprofs_nu))
 
-    end = time.time()
-    print('Time elapsed (s): ', end - start)
+    # end = time.time()
+    # print('Time elapsed (s): ', end - start)
 
     # area normalise and convert wavelength units to m:
     wl_axis = delta_lambda2 * 1e-10
