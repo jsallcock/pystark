@@ -16,7 +16,6 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     """
 
     start = time.time()
-
     assert n_lower in range(1, 4)
     assert n_upper in range(n_lower + 1, 31)
 
