@@ -1,27 +1,24 @@
-import scipy.io.netcdf as netcdf
-from scipy.constants import c, e, k
-import matplotlib.pyplot as plt
 import numpy as np
-import time
-import pystarky
+import pystark
 from scipy.constants import *
-import os
-import scipy.integrate
-from matplotlib.colors import LogNorm
 
 
 def simple_profile(n_upper, n_lower, temperature, density, spectrum='wavelength', mode='griem'):
-    """ Use Griem's scaling for an approximate Stark-broadened line in a certain parameter region. 
+    """ Approximate Stark-broadened line profile, area-normalised to 1.
+
+     use mode='griem' for a Lorentzian Stark profile that follows Griem's density scaling:
 
     - Scaling is well fulfilled for n_e > 10 ** 20 m ** -3 and T_i ~ 1eV.
     - Unverified for n_e > 10 ** 21 m ** -3
 
-    TODO: CORRECT NORMALISATION TO MATCH STEHLE
+
+    use mode='lomanowski' for B. Lomanowski's parameterised Stark profile, based on Stehle's tabulated data.
 
     :param n_upper: upper principal quantum number
     :param n_lower: lower principal quantum number
     :param temperature: in eV
     :param density: in m ** -3
+    :param spectrum: output the spectrum as a function of 'frequency' or 'wavelength'.
 
     """
 
@@ -35,7 +32,7 @@ def simple_profile(n_upper, n_lower, temperature, density, spectrum='wavelength'
 
     # load line centre from Stehle tables
     prefix = 'n_' + str(n_upper) + '_' + str(n_lower) + '_'
-    wl_0 = nc.variables[prefix + 'olam0'].data[0] * 1e-10  # line centre wavlength (m)
+    wl_0 = pystark.nc.variables[prefix + 'olam0'].data[0] * 1e-10  # line centre wavlength (m)
     wl_0_nm = wl_0 * 1e9
     freq_0 = c / wl_0
 

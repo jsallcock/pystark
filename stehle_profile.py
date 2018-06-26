@@ -1,16 +1,7 @@
-import scipy.io.netcdf as netcdf
-from scipy.constants import c, e, k
-import matplotlib.pyplot as plt
 import numpy as np
 import time
-import pystarky
+import pystark
 from scipy.constants import *
-import os
-import scipy.integrate
-from matplotlib.colors import LogNorm
-
-# load data from 'stehle_tables.nc'
-nc = netcdf.netcdf_file(pystarky.paths.netcdf_data_path, 'r')
 
 
 def stehle_profile(n_upper, n_lower, temperature, density):
@@ -24,8 +15,6 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     :return: wl_axis, lineshape_m, wprofs_nu2
     """
 
-    # print('pystarky')
-
     start = time.time()
 
     assert n_lower in range(1, 4)
@@ -34,21 +23,21 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     prefix = 'n_' + str(n_upper) + '_' + str(n_lower) + '_'
 
     # extract raw_data
-    tempe = np.array(nc.variables[prefix + 'tempe'].data)  # electron temperature (K)
-    olam0 = nc.variables[prefix + 'olam0'].data  # line centre wavlength (A)
-    id_max = nc.variables[prefix + 'id_max'].data
-    fainom = nc.variables[prefix + 'fainom'].data
-    dense = np.array(nc.variables[prefix + 'dense'].data)  # electron density (cm ** -3)
-    f00 = np.array(nc.variables[prefix + 'f00'].data)      #  normal Holtsmark field strength (30 kV / m)
-    dl12 = np.array(nc.variables[prefix + 'dl12'].data)
-    dl12s = np.array(nc.variables[prefix + 'dl12s'].data)
-    fainu = nc.variables[prefix + 'fainu'].data  # Asymptotic value of iStark * (alpha ** 2.5) ("wings factor in alfa units")
-    pr0 = np.array(nc.variables[prefix + 'pr0'].data)      # Ratio of the mean interelectronic distance to the electronic Debye length
-    jtot = np.array(nc.variables[prefix + 'jtot'].data, dtype=np.int)
-    dom = np.array(nc.variables[prefix + 'dom'].data)
-    d1om = np.array(nc.variables[prefix + 'd1om'].data)
-    o1line = np.array(nc.variables[prefix + 'o1line'].data)
-    o1lines = np.array(nc.variables[prefix + 'o1lines'].data)
+    tempe = np.array(pystark.nc.variables[prefix + 'tempe'].data)  # electron temperature (K)
+    olam0 = pystark.nc.variables[prefix + 'olam0'].data  # line centre wavlength (A)
+    id_max = pystark.nc.variables[prefix + 'id_max'].data
+    fainom = pystark.nc.variables[prefix + 'fainom'].data
+    dense = np.array(pystark.nc.variables[prefix + 'dense'].data)  # electron density (cm ** -3)
+    f00 = np.array(pystark.nc.variables[prefix + 'f00'].data)      #  normal Holtsmark field strength (30 kV / m)
+    dl12 = np.array(pystark.nc.variables[prefix + 'dl12'].data)
+    dl12s = np.array(pystark.nc.variables[prefix + 'dl12s'].data)
+    fainu = pystark.nc.variables[prefix + 'fainu'].data  # Asymptotic value of iStark * (alpha ** 2.5) ("wings factor in alfa units")
+    pr0 = np.array(pystark.nc.variables[prefix + 'pr0'].data)      # Ratio of the mean interelectronic distance to the electronic Debye length
+    jtot = np.array(pystark.nc.variables[prefix + 'jtot'].data, dtype=np.int)
+    dom = np.array(pystark.nc.variables[prefix + 'dom'].data)
+    d1om = np.array(pystark.nc.variables[prefix + 'd1om'].data)
+    o1line = np.array(pystark.nc.variables[prefix + 'o1line'].data)
+    o1lines = np.array(pystark.nc.variables[prefix + 'o1lines'].data)
 
     load_time = time.time() - start
     # print('load_time:', load_time)

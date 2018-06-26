@@ -34,6 +34,7 @@ def get_fwhm(x, y, disp=False):
 
     return fwhm
 
-def norm(ls):
+def normh(ls):
+    """ height normalise peak. """
     return ls / np.max(ls)
 
