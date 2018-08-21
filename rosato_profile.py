@@ -24,7 +24,7 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, 
     
     Oh boy, this is mostly translated line-by-line, can you tell?  
     
-    NOT YET BENCHMARKED AGAINST THE FORTRAN CODE
+    BENCHMARKED AGAINST THE FORTRAN CODE, ls and detunings values match fortran output to 1 part in ~10^6
     
     :param n_upper: 
     :param dens: [cm-3]
@@ -154,17 +154,27 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, 
                                                      ls_arr2[i_dens, i_temp, 0, i_angle, i]
 
     # interpolation in density and temperature (equ. 2)
-    for i, w in enumerate(detuning_axis):  # can be vectorised
-        for i_angle in range(2):
-            print(i, i_angle, dens_1_idx - 1, temp_1_idx - 1)
-            ls_arr4[i_angle, i] = 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) * ls_arr3[1, 0, i_angle, i] + \
-                    2. * np.log10(temp / temp_grid[temp_1_idx - 1]) * ls_arr3[0, 1, i_angle, i] + \
-                    (1. - 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) - 2. * np.log10(temp / temp_grid[temp_1_idx - 1])) * ls_arr3[0, 0, i_angle, i]
+
+
+    # for i, w in enumerate(detuning_axis):  # can be vectorised
+    #     for i_angle in range(2):
+    #         print(i, i_angle, dens_1_idx - 1, temp_1_idx - 1)
+    #         ls_arr4[i_angle, i] = 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) * ls_arr3[1, 0, i_angle, i] + \
+    #                 2. * np.log10(temp / temp_grid[temp_1_idx - 1]) * ls_arr3[0, 1, i_angle, i] + \
+    #                 (1. - 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) - 2. * np.log10(temp / temp_grid[temp_1_idx - 1])) * ls_arr3[0, 0, i_angle, i]
+
+    ls_arr4[:, :] = 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) * ls_arr3[1, 0, :, :] + \
+                          2. * np.log10(temp / temp_grid[temp_1_idx - 1]) * ls_arr3[0, 1, :, :] + \
+                          (1. - 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) - 2. * np.log10(
+                              temp / temp_grid[temp_1_idx - 1])) * ls_arr3[0, 0, :, :]
 
     # account for view angle (section 3)
-    viewangle *= 3.141593 / 180. #np.pi / 180  # [deg] to [rad]
-    for i, w in enumerate(detuning_axis):  # can be vectorised
-        ls[i] = ls_arr4[0, i] * np.sin(viewangle) ** 2 + ls_arr4[1, i] * np.cos(viewangle) ** 2
+    viewangle *= 3.141593 / 180.  # np.pi / 180  # [deg] to [rad]
+
+    # for i, w in enumerate(detuning_axis):  # can be vectorised
+    #     ls[i] = ls_arr4[0, i] * np.sin(viewangle) ** 2 + ls_arr4[1, i] * np.cos(viewangle) ** 2
+
+    ls = ls_arr4[0, :] * np.sin(viewangle) ** 2 + ls_arr4[1, :] * np.cos(viewangle) ** 2
 
 
     if display:
@@ -178,7 +188,7 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, 
 
 
 
-def read_single_file(n_upper, dens_idx, temp_idx, bfield_idx, viewangle_idx, display=False):
+def read_single_file(n_upper, dens_idx, temp_idx, bfield_idx, viewangle_idx):
     """ Given the indices of the plasma parameter grids, load the lineshape from file.
     
     indexing inputs begins at 0 here, whereas in the filenames it begins at 1 ...except for viewangle...
@@ -199,25 +209,11 @@ def read_single_file(n_upper, dens_idx, temp_idx, bfield_idx, viewangle_idx, dis
     load_file_path = os.path.join(load_dir_path, filename)
 
     arr = np.loadtxt(load_file_path)
-    detunings = arr[:, 0]  # [eV]
-    ls = arr[:, 1]  # looks like lineshape is area normalised to 1, although the wings are cut off for some grid-points.
 
-    if display:
-        print(load_file_path)
-
-        plt.figure()
-        plt.plot(detunings, ls)
-        plt.ylabel('ls')
-        plt.xlabel('Detuning (eV)')
-        plt.show()
-
-    return detunings, ls
+    return arr[:, 0], arr[:, 1]
 
 
 if __name__ == '__main__':
     # read_single_file(3, 9, 3, 5, 1, display=True)
 
     x, y = rosato_stark_zeeman_profile(4, 2.41e15, 1.22, 2.25, 86.2, 5e-3, 1000, display=True)
-
-
-    #
