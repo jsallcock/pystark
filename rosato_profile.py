@@ -20,9 +20,11 @@ def rosato_profile(n_upper, temperature, density, bfield, viewangle, freq_detuni
 
 
 def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, display=False):
-    """ A python port of the LS_DATA_read.f90 from the supplementary material. 
+    """ A python port of the LS_DATA_read.f90 from the Rosato et al. supplementary material. 
     
     Oh boy, this is mostly translated line-by-line, can you tell?  
+    
+    NOT YET BENCHMARKED AGAINST THE FORTRAN CODE
     
     :param n_upper: 
     :param dens: [cm-3]
@@ -64,6 +66,9 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, 
     for i_angle in range(2):
         for i_dens in range(2):
             for i_temp in range(2):
+                if i_dens * i_temp == 1:
+                    break
+                    # break ensures that only the necessary lineshape data is loaded (i_dens = 1, i_temp = 1 is not used)
                 for i_bfield in range(2):
                     w_arr[i_dens, i_temp, i_bfield, i_angle, :], ls_arr[i_dens, i_temp, i_bfield, i_angle, :] \
                         = read_single_file(n_upper, dens_idxs[i_dens], temp_idxs[i_temp], bfield_idxs[i_bfield], i_angle)
@@ -110,8 +115,8 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, 
                                 break  # ensures that the lineshape is zero outside of the tabulated detuning values
 
                         if iw != 0 and iw < 999:
-                            ls_arr2[i_dens, i_temp, 0, i_angle, i] =	ls_arr[i_dens, i_temp, 0, i_angle, iw-1] + \
-                                                               (w - w_arr[i_dens, i_temp, 0, i_angle, iw-1]) * \
+                            ls_arr2[i_dens, i_temp, 0, i_angle, i] = ls_arr[i_dens, i_temp, 0, i_angle, iw - 1] + \
+                                                               (w - w_arr[i_dens, i_temp, 0, i_angle, iw - 1]) * \
                                                                (ls_arr[i_dens, i_temp, 0, i_angle, iw] - ls_arr[i_dens,i_temp, 0, i_angle, iw-1])	/ \
                                                                (w_arr[i_dens, i_temp, 0, i_angle, iw] - w_arr[i_dens, i_temp, 0, i_angle, iw-1])
 
@@ -134,12 +139,12 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, 
                                                             (ls_arr[i_dens, i_temp, 0, i_angle, iw] - ls_arr[i_dens, i_temp, 0, i_angle, iw-1]) / \
                                                             (w_arr[i_dens, i_temp, 0, i_angle, iw] - w_arr[i_dens, i_temp, 0, i_angle, iw-1])
                         for iw in range(1000):
-                            if w < (w_arr[i_dens, i_temp, 1, i_angle, iw] * bf / bfield_grid[2]):
+                            if w < (w_arr[i_dens, i_temp, 1, i_angle, iw] * bf / bfield_grid[1]):
                                 break
 
                         if iw != 0 and iw < 999:
                             ls_arr2[i_dens, i_temp, 1, i_angle, i] = ls_arr[i_dens, i_temp, 1, i_angle, iw - 1] + \
-                                                            (w * bfield_grid[2] / bf - w_arr[i_dens, i_temp, 1, i_angle, iw - 1]) * \
+                                                            (w * bfield_grid[1] / bf - w_arr[i_dens, i_temp, 1, i_angle, iw - 1]) * \
                                                             (ls_arr[i_dens, i_temp, 1, i_angle, iw] - ls_arr[i_dens, i_temp, 1, i_angle, iw - 1]) / \
                                                             (w_arr[i_dens, i_temp, 1, i_angle, iw] - w_arr[i_dens, i_temp, 1, i_angle, iw - 1])
 
@@ -157,7 +162,7 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, 
                     (1. - 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) - 2. * np.log10(temp / temp_grid[temp_1_idx - 1])) * ls_arr3[0, 0, i_angle, i]
 
     # account for view angle (section 3)
-    viewangle *= np.pi / 180  # [deg] to [rad]
+    viewangle *= 3.141593 / 180. #np.pi / 180  # [deg] to [rad]
     for i, w in enumerate(detuning_axis):  # can be vectorised
         ls[i] = ls_arr4[0, i] * np.sin(viewangle) ** 2 + ls_arr4[1, i] * np.cos(viewangle) ** 2
 
@@ -165,6 +170,8 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, 
     if display:
         plt.figure()
         plt.plot(detuning_axis, ls)
+        plt.ylabel('ls')
+        plt.xlabel('Detuning (eV)')
         plt.show()
 
     return detuning_axis, ls
@@ -200,6 +207,8 @@ def read_single_file(n_upper, dens_idx, temp_idx, bfield_idx, viewangle_idx, dis
 
         plt.figure()
         plt.plot(detunings, ls)
+        plt.ylabel('ls')
+        plt.xlabel('Detuning (eV)')
         plt.show()
 
     return detunings, ls
@@ -208,7 +217,7 @@ def read_single_file(n_upper, dens_idx, temp_idx, bfield_idx, viewangle_idx, dis
 if __name__ == '__main__':
     # read_single_file(3, 9, 3, 5, 1, display=True)
 
-    x, y = rosato_stark_zeeman_profile(4, 1.1e13, 0.8, 4.96, 90, 5e-3, 1001, display=True)
+    x, y = rosato_stark_zeeman_profile(4, 2.41e15, 1.22, 2.25, 86.2, 5e-3, 1000, display=True)
 
 
     #

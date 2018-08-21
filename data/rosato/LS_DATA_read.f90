@@ -113,26 +113,30 @@ subroutine set_name_file(nq,iN,iT,iB,iangle,dir,name)
 	character(21)::dir
 	character(66)::name
 	integer::i,iN1,iT1,iB1
-	dir(1:11)='.\database\'
+	! JSALLCOCK: I have changed the back-slashes to forward slashes here to work on MAC
+	dir(1:11)='./database/'
 	select case(nq)
 		case(3)
-			dir(12:)='D_alpha\'
+			dir(12:)='D_alpha/'
 		case(4)
-			dir(12:)='D_beta\'
+			dir(12:)='D_beta/'
 		case(5)
-			dir(12:)='D_gamma\'
+			dir(12:)='D_gamma/'
 		case(6)
-			dir(12:)='D_delta\'
+			dir(12:)='D_delta/'
 		case(7)
-			dir(12:)='D_epsilon\'
+			dir(12:)='D_epsilon/'
 	end select
 	i=1
 	do iN1=0,1
 		do iT1=0,1
 			if(iN1*iT1.eq.1) exit
 			do iB1=0,1
-				name(i:i+10)='ls0'//trim(char(ichar('0')+iN-1+iN1))//trim(char(ichar('0')+iT-1+iT1))//trim(char(ichar('0')+iB-1+iB1))//trim(char(ichar('0')+iangle))//'.txt'
-				if(iN.eq.10) name(i:i+10)='ls10'//trim(char(ichar('0')+iT-1+iT1))//trim(char(ichar('0')+iB-1+iB1))//trim(char(ichar('0')+iangle))//'.txt'
+				name(i:i+10)='ls0'//trim(char(ichar('0')+iN-1+iN1))//trim(char(ichar('0')+ &
+						iT-1+iT1))//trim(char(ichar('0')+iB-1+iB1))//trim(char(ichar('0')+ &
+						iangle))//'.txt'
+				if(iN.eq.10) name(i:i+10)='ls10'//trim(char(ichar('0')+iT-1+iT1))//trim(char(ichar('0')+&
+						iB-1+iB1))//trim(char(ichar('0')+iangle))//'.txt'
 				i=i+11
 			end do
 		end do
