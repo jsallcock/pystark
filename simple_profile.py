@@ -1,9 +1,10 @@
 import numpy as np
 import pystark
 from scipy.constants import *
+from scipy.signal import fftconvolve as conv
 
 
-def simple_profile(n_upper, n_lower, temperature, density, spectrum='wavelength', mode='griem'):
+def simple_profile(n_upper, n_lower, temperature, density, len_axis=20001, spectrum='wavelength', model='lomanowski'):
     """ Approximate Stark-broadened line profile, area-normalised to 1.
 
      use mode='griem' for a Lorentzian Stark profile that follows Griem's density scaling:
@@ -22,61 +23,67 @@ def simple_profile(n_upper, n_lower, temperature, density, spectrum='wavelength'
 
     """
 
-    valid_n_upper = [4, 5, 6, 8, 10]
+    # ensure odd length axis
+    assert len_axis % 2 != 0
+
+    valid_n_upper = [3, 4, 5, 6, 7, 8, 10]
 
     # lomanowski_valid_n_upper = []
     assert n_upper in valid_n_upper
 
     valid_modes = ['griem', 'lomanowski']
-    assert mode in valid_modes
+    assert model in valid_modes
 
-    # load line centre from Stehle tables
-    prefix = 'n_' + str(n_upper) + '_' + str(n_lower) + '_'
-    wl_0 = pystark.nc.variables[prefix + 'olam0'].data[0] * 1e-10  # line centre wavlength (m)
+    # line centre wavelength from NIST
+    # prefix = 'n_' + str(n_upper) + '_' + str(n_lower) + '_'
+    # wl_0 = pystark.nc.variables[prefix + 'olam0'].data[0] * 1e-10  # line centre wavlength (m)
+    wl_0 = pystark.get_stehle_balmer_wavelength(n_upper)
     wl_0_nm = wl_0 * 1e9
     freq_0 = c / wl_0
 
     # ----- approximate FWHM of Voigt profile to dynamically generate frequency axis
+    fwhm_voigt_hz, fwhm_lorentz_hz, fwhm_gauss_hz = pystark.estimate_fwhms(n_upper, density, temperature)
+    print(fwhm_voigt_hz * c / freq_0 ** 2)
+    sigma_gauss_hz = fwhm_gauss_hz / (2 * np.sqrt(2 * np.log(2)))
 
-    # Doppler FWHM: Gaussian
+    # generate frequency and wavelength axes
+    num_fwhm = 200
+    # len_axis = 20001  # odd number of points such that nu_0 lies exactly at the array centre.
+    min_freq, max_freq = (freq_0 - num_fwhm * fwhm_voigt_hz, freq_0 + num_fwhm * fwhm_voigt_hz)
+    freq_axis = np.linspace(min_freq, max_freq, len_axis)
+
+    min_wl, max_wl = (c / max_freq, c / min_freq)
+    wl_axis = np.linspace(min_wl, max_wl, len_axis)
+    wl_axis_nm = wl_axis * 1e9
+
+    # generate a larger, convolution axis -- this avoids any
+    # unwanted edge effects from the convolution.
+
+    dfreq = (max_freq - min_freq) / len_axis
+    min_freq_conv = min_freq - len_axis / 3 * dfreq
+    max_freq_conv = max_freq + len_axis / 3 * dfreq
+    freq_axis_conv = np.linspace(min_freq_conv, max_freq_conv, 3 * len_axis)
+
+    dwl = (max_wl - min_wl) / len_axis
+    min_wl_conv = min_wl - len_axis / 3 * dwl
+    max_wl_conv = max_wl + len_axis / 3 * dwl
+    wl_axis_conv = np.linspace(min_wl_conv, max_wl_conv, 3 * len_axis)
+    wl_axis_conv_nm = wl_axis_conv * 1e9
+
+    # Doppler lineshape
     temperature_k = temperature * e / k
     mass_kg = physical_constants['deuteron mass'][0]
     v_th = np.sqrt(2 * k * temperature_k / mass_kg)
-    sigma_gauss_hz = v_th * freq_0 / (np.sqrt(2) * c)
-    fwhm_gauss_hz = 2 * np.sqrt(2 * np.log(2)) * sigma_gauss_hz
-
-    # Stark FWHM: Lorentzian
-    griem_alpha_12s = {4: 0.08, 5: 0.09, 6: 0.17, 8: 0.28, 10: 0.46}
-    alpha_12 = griem_alpha_12s[n_upper]
-
-    ne_20 = density * 1e-20  # convert into units: 10 ** 20 m ** -3
-    fwhm_lorentz_m = 1e-9 * 0.54 * alpha_12 * ne_20 ** (2. / 3.)  # Griem scaling
-    fwhm_lorentz_hz = fwhm_lorentz_m * freq_0 ** 2 / c
-
-    # total FWHM: Voigt
-    fwhm_voigt_hz = 0.5346 * fwhm_lorentz_hz + np.sqrt(0.2166 * fwhm_lorentz_hz ** 2 + fwhm_gauss_hz ** 2)
-
-    # generate frequency and wavelength axes
-    num_fwhm = 20
-    num_points = 20001  # odd number of points such that nu_0 lies exactly at the array centre.
-    min_freq, max_freq = (freq_0 - num_fwhm * fwhm_voigt_hz, freq_0 + num_fwhm * fwhm_voigt_hz)
-    freq_axis = np.linspace(min_freq, max_freq, num_points)
-
-    min_wl, max_wl = (c / max_freq, c / min_freq)
-    wl_axis = np.linspace(min_wl, max_wl, num_points)
-    wl_axis_nm = wl_axis * 1e9
-
-    # Doppler lineshape
     doppler_lineshape_hz = (freq_0 ** -1) * ((np.pi * (v_th ** 2 / (c ** 2))) ** -0.5) * np.exp \
-        (-(((freq_axis - freq_0) ** 2) / (2 * sigma_gauss_hz ** 2)))
+        (-(((freq_axis_conv - freq_0) ** 2) / (2 * sigma_gauss_hz ** 2)))
 
     # Stark lineshape
-    if mode == 'griem':
+    if model == 'griem':
 
         hwhm_lorentz_hz = fwhm_lorentz_hz / 2
-        stark_lineshape_hz = (1 / np.pi) * hwhm_lorentz_hz / ((freq_axis - freq_0) ** 2 + hwhm_lorentz_hz ** 2)
+        stark_lineshape_hz = (1 / np.pi) * hwhm_lorentz_hz / ((freq_axis_conv - freq_0) ** 2 + hwhm_lorentz_hz ** 2)
 
-    elif mode == 'lomanowski':
+    elif model == 'lomanowski':
 
         # Paramaterised MMM Stark profile coefficients from Bart's paper
         loman_abc_ij_idx = {'32': 0,
@@ -141,14 +148,15 @@ def simple_profile(n_upper, n_lower, temperature, density, spectrum='wavelength'
 
         delta_lambda_12ij = c_ij * (density ** a_ij) / (temperature ** b_ij)  # nm
 
-        stark_lineshape_m = 1 / (abs(wl_axis_nm - wl_0_nm) ** (5. / 2.) + (delta_lambda_12ij / 2) ** (5. / 2.))
-        stark_lineshape_m /= np.trapz(stark_lineshape_m, wl_axis)
+        stark_lineshape_m = 1 / (abs(wl_axis_conv_nm - wl_0_nm) ** (5. / 2.) + (delta_lambda_12ij / 2) ** (5. / 2.))
+        stark_lineshape_m /= np.trapz(stark_lineshape_m, wl_axis_conv)
 
-        stark_lineshape_hz = np.interp(freq_axis, c / wl_axis[::-1], stark_lineshape_m[::-1] * (wl_axis ** 2 / c))
+        stark_lineshape_hz = np.interp(freq_axis_conv, c / wl_axis_conv[::-1], stark_lineshape_m[::-1] * (wl_axis_conv ** 2 / c))
 
     # Voigt lineshape
-    voigt_lineshape_hz = np.convolve(doppler_lineshape_hz, stark_lineshape_hz, 'same')
-    voigt_lineshape_hz /= np.trapz(voigt_lineshape_hz, freq_axis)  # normalise
+    # voigt_lineshape_hz = np.convolve(stark_lineshape_hz, doppler_lineshape_hz, 'same')
+    voigt_lineshape_hz = conv(stark_lineshape_hz, doppler_lineshape_hz, 'same')
+    voigt_lineshape_hz /= np.trapz(voigt_lineshape_hz, freq_axis_conv)  # normalise
 
 
     # return spectra in wavelength or frequency:
@@ -156,11 +164,16 @@ def simple_profile(n_upper, n_lower, temperature, density, spectrum='wavelength'
 
     if spectrum == 'wavelength':
 
-        doppler_lineshape_m = np.interp(wl_axis, c / freq_axis[::-1], doppler_lineshape_hz[::-1] * freq_axis ** 2 / c)
-        stark_lineshape_m = np.interp(wl_axis, c / freq_axis[::-1], stark_lineshape_hz[::-1] * freq_axis ** 2 / c)
-        voigt_lineshape_m = np.interp(wl_axis, c / freq_axis[::-1], voigt_lineshape_hz[::-1] * freq_axis ** 2 / c)
+        doppler_lineshape_m = np.interp(wl_axis, c / freq_axis_conv[::-1], doppler_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
+        stark_lineshape_m = np.interp(wl_axis, c / freq_axis_conv[::-1], stark_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
+        voigt_lineshape_m = np.interp(wl_axis, c / freq_axis_conv[::-1], voigt_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
 
         return wl_axis, wl_0, voigt_lineshape_m, stark_lineshape_m, doppler_lineshape_m
 
     elif spectrum == 'frequency':
+
+        doppler_lineshape_hz = np.interp(freq_axis, freq_axis_conv, doppler_lineshape_hz)
+        stark_lineshape_hz = np.interp(freq_axis, freq_axis_conv, stark_lineshape_hz)
+        voigt_lineshape_hz = np.interp(freq_axis, freq_axis_conv, voigt_lineshape_hz)
+
         return freq_axis, freq_0, voigt_lineshape_hz, stark_lineshape_hz, doppler_lineshape_hz

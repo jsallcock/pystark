@@ -25,8 +25,8 @@ def stehle_profile(n_upper, n_lower, temperature, density):
 
     # extract raw tabulated data
     tab_temp_k = np.array(pystark.nc.variables[prefix + 'tempe'].data)  # tabulated electron temperatures (K)
-    olam0 = pystark.nc.variables[prefix + 'olam0'].data  # line centre wavlength (A)
-    id_max = pystark.nc.variables[prefix + 'id_max'].data
+    olam0 = pystark.nc.variables[prefix + 'olam0'].data  # line centre wavelength (A)
+    num_tab_dens = pystark.nc.variables[prefix + 'id_max'].data
     fainom = pystark.nc.variables[prefix + 'fainom'].data
     tab_dens_cm = np.array(pystark.nc.variables[prefix + 'dense'].data)  # tabulated electron densities  (cm ** -3)
     f00 = np.array(pystark.nc.variables[prefix + 'f00'].data)      # normal Holtsmark field strength (30 kV / m)
@@ -34,15 +34,26 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     dl12s = np.array(pystark.nc.variables[prefix + 'dl12s'].data)
     fainu = pystark.nc.variables[prefix + 'fainu'].data  # Asymptotic value of iStark * (alpha ** 2.5) ("wings factor in alfa units")
     pr0 = np.array(pystark.nc.variables[prefix + 'pr0'].data)      # Ratio of the mean interelectronic distance to the electronic Debye length
-    jtot = np.array(pystark.nc.variables[prefix + 'jtot'].data, dtype=np.int)
-    dom = np.array(pystark.nc.variables[prefix + 'dom'].data)
+    jtot = np.array(pystark.nc.variables[prefix + 'jtot'].data, dtype=np.int)  #  "number of wave lengths for the couple (T,Ne)"
+    dom = np.array(pystark.nc.variables[prefix + 'dom'].data)  # frequency detunings in units (rad / (s*ues)
     d1om = np.array(pystark.nc.variables[prefix + 'd1om'].data)
     o1line = np.array(pystark.nc.variables[prefix + 'o1line'].data)
     o1lines = np.array(pystark.nc.variables[prefix + 'o1lines'].data)
 
     # ensure given temperature + density falls within tabulated values
-    if dens_cm >= 2.0 * tab_dens_cm[id_max]:
-        raise Exception('Your input density is higher than the largest tabulated value %f' % tab_dens_cm[id_max])
+    # change sligtly the value of the input density
+    # dens_cm in order to remain , as far as possible, inside the tabulation
+    # JSA: this first step seems bogus!
+
+    if np.abs(dens_cm - tab_dens_cm[0]) / dens_cm <= 1.0E-3:
+        dens_cm = tab_dens_cm[0] * 1.001
+
+    for id in np.arange(1, num_tab_dens + 1):
+        if np.abs(dens_cm - tab_dens_cm[id]) / dens_cm <= 1.0E-3:
+            dens_cm = tab_dens_cm[id] * 0.999
+
+    if dens_cm >= 2.0 * tab_dens_cm[num_tab_dens]:
+        raise Exception('Your input density is higher than the largest tabulated value %f' % tab_dens_cm[num_tab_dens])
 
     if dens_cm <= tab_dens_cm[0]:
         raise Exception('Your input density is smaller than the smallest tabulated value %f' % tab_dens_cm[0])
@@ -60,6 +71,8 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     # TODO make sure this matches olam0 parameter above -- why were there two variables in the first place?!
     rydberg_m = Rydberg / (1. + (electron_mass / physical_constants['deuteron mass'][0]))
     wl_0_angst = 1e10 * (rydberg_m * (1 / n_lower ** 2 - 1 / n_upper ** 2)) ** -1
+
+    # wl_0_angst = pystark.tools.get_NIST_balmer_wavelength(n_upper) * 1e10
 
     c_angst = c * 1e10  # velocity of light in Ansgtroms / s
     angular_freq_0 = 2 * np.pi * c_angst/ wl_0_angst  # rad / s
@@ -93,17 +106,6 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     # Skipped the code in the IF statement starting at line 470, since it
     # isn't used, if (.FALSE.) ...
 
-    # ========================================================
-    # change sligtly the value of the input density
-    # DENS in order to remain , as far as possible, inside the tabulation
-
-    if np.abs(dens_cm - tab_dens_cm[0]) / dens_cm <= 1.0E-3:
-        dens_cm = tab_dens_cm[0] * 1.001
-
-    for id in np.arange(1, id_max + 1):
-        if np.abs(dens_cm - tab_dens_cm[id]) / dens_cm <= 1.0E-3:
-            dens_cm = tab_dens_cm[id] * 0.999
-
     # ==============================================
     # define an unique detunings grid - domm -  for the tabulated
     # profiles ( various temperatures , densities)
@@ -111,24 +113,24 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     # units used at this points are Domega_new= Delta(omega)/F00
     #                                      in rd/(s-1 ues)
 
-    id_maxi = 30  # Maximum number of densities
-    max_d = 60  # Maximum number of detunings
+    max_num_dens = 30  # Maximum number of densities
+    max_num_tab_temp = 10
+    max_num_detunings = 60  # Maximum number of detunings
     jtot = jtot.astype(np.int)
     domm = np.zeros(100000)
     dom0 = np.zeros(10000)
-    tprof = np.zeros([id_maxi, 10, 10000])
-    tprofs = np.zeros([id_maxi, 10, 10000])
-    uprof = np.zeros([id_maxi, 10000])
-    uprofs = np.zeros([id_maxi, 10000])
-
+    tprof = np.zeros([max_num_dens, max_num_tab_temp, 10000])
+    tprofs = np.zeros([max_num_dens, max_num_tab_temp, 10000])
+    uprof = np.zeros([max_num_dens, 10000])
+    uprofs = np.zeros([max_num_dens, 10000])
 
     inc = 0
     domm[inc] = 0.0
     # ---- Look to replace this loop
-    for id in np.arange(id_max + 1):
-        for j in np.arange(10):
+    for id in np.arange(num_tab_dens + 1):  # loop over tab densities
+        for j in np.arange(max_num_tab_temp):  # loop over tab temperatures (?)
             for i in np.arange(1, jtot[id, j]):
-                inc = inc + 1
+                inc += 1
                 dom0[inc] = dom[id, j, i]
 
     inc = np.count_nonzero(dom)
@@ -145,7 +147,6 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     # print 'npik',npik
     # ---- Look to replace this loop
     for i in np.arange(1, npik):
-        # print 'i',i
         dif = (dom0[i] - dom0[i - 1])
         if dif <= 1.0E-6:
             continue
@@ -156,16 +157,13 @@ def stehle_profile(n_upper, n_lower, temperature, density):
 
     jdom = inc + 1  # One line after marker 35
 
-    for id in np.arange(id_max):
+    for id in np.arange(num_tab_dens):
         for j in np.arange(10):
             if pr0[id, j] > 1.0:
                 continue
 
             tprof[id, j, 0] = oline[id, j, 0]
             tprofs[id, j, 0] = olines[id, j, 0]
-
-            # print 'id,j',id,j
-            # print 'tprof,tprofs:',tprof[id,j,0],tprofs[id,j,0]
 
             if jtot[id, j] == 0:
                 continue
@@ -238,7 +236,7 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     # We can skip writing the intermediate file
 
 
-    for id in np.arange(id_max):
+    for id in np.arange(num_tab_dens):
         otest_dens = (dens_cm - tab_dens_cm[id]) * (dens_cm - tab_dens_cm[id + 1])
         if otest_dens <= 0.0:
             dense1 = tab_dens_cm[id]
@@ -247,11 +245,11 @@ def stehle_profile(n_upper, n_lower, temperature, density):
             id2 = id + 1
             break
 
-    if dens_cm >= tab_dens_cm[id_max]:
-        dense1 = tab_dens_cm[id_max - 1]
-        dense2 = tab_dens_cm[id_max]
-        id1 = id_max - 1
-        id2 = id_max
+    if dens_cm >= tab_dens_cm[num_tab_dens]:
+        dense1 = tab_dens_cm[num_tab_dens - 1]
+        dense2 = tab_dens_cm[num_tab_dens]
+        id1 = num_tab_dens - 1
+        id2 = num_tab_dens
 
     for it in np.arange(10):
         otest = (temp_k - tab_temp_k[it]) * (temp_k - tab_temp_k[it + 1])
