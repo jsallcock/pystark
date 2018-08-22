@@ -14,7 +14,7 @@ Authorship:
 parameterised model](http://iopscience.iop.org/article/10.1088/0029-5515/55/12/123028/meta "Bart's paper") of the tabulated Stehle data.
 
 - **stehle_profile():** Use the tabulated Stehle data (Stark-Doppler). [paper](https://lerma.obspm.fr/~stehle/Articles/1999AAS140Stehle.pdf)
-- **rosato_profile():** Use the tabulated Rosato data (Stark-Zeeman). Will add Doppler broadening to this. [paper](https://www.sciencedirect.com/science/article/pii/S0022407316305325)
+- **rosato_profile():** Use the tabulated Rosato data (Stark-Zeeman). Will add Doppler broadening to this. [paper](https://www.sciencedirect.com/science/article/pii/S0022407316305325). THIS ONE ACCESSES FORTRAN SUBROUTINES THROUGH f2py, I HAVEN'T YET MADE SURE THE .SO FILE WORKS FOR ANYONE ELSE, BEWARE.
 
 
 # Prerequisites
