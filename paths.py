@@ -8,7 +8,8 @@ data_dir_path = os.path.join(root, 'data')
 stehle_netcdf_file_path = os.path.join(data_dir_path, 'stehle', 'stehle_tables.nc')
 stehle_raw_data_path = os.path.join(data_dir_path, 'stehle', 'raw')
 
-rosato_database_path = os.path.join(data_dir_path, 'rosato', 'database')
+rosato_path = os.path.join(data_dir_path, 'rosato/')
+rosato_database_path = os.path.join(rosato_path, 'database')
 
 # print(stehle_netcdf_file_path)
 # load data from 'stehle_tables.nc'

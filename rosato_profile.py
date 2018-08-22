@@ -1,219 +1,173 @@
 import os
+import sys
+import time
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.constants import e, c, k, h, physical_constants
+from scipy.signal import fftconvolve as conv
 
 import pystark
 
-
-# parameter grid, as defined at the start of section 3
-dens_grid = np.array([1.e13, 2.15e13, 4.64e13, 1.e14, 2.15e14, 4.64e14, 1.e15, 2.15e15, 4.64e15, 1.e16])  # [cm-3]
-temp_grid = np.array([0.316, 1., 3.16, 10, 31.6])  # [eV]
-bfield_grid = np.array([0., 1., 2., 2.5, 3., 5.])  # [T]
-viewangle_grid = np.array([90., 0.])  # [rad.]
+sys.path.insert(0, pystark.paths.rosato_path)
+import LS_DATA_read_f2py  # this is the shared object generated using the fortran subroutines in LS_DATA_read_f2py.f90
 
 
-
-def rosato_profile(n_upper, temperature, density, bfield, viewangle, freq_detunings):
-    density *= 1e-6  # [m ** -3] to [cm ** -3]
-
-    return
-
-
-def rosato_stark_zeeman_profile(n_upper, dens, temp, bf, viewangle, wmax, npts, display=False):
-    """ A python port of the LS_DATA_read.f90 from the Rosato et al. supplementary material. 
+def rosato_profile(n_upper, dens, temp, bfield, viewangle, wavelengths, display=False):
+    """ Stark-Zeeman-Doppler lineshape profile for the first Balmer lines, interpolated from the Rosato et al. data 
+    tables.
     
-    Oh boy, this is mostly translated line-by-line, can you tell?  
+    Ported by Joe Allcock, 08/18.
     
-    BENCHMARKED AGAINST THE FORTRAN CODE, ls and detunings values match fortran output to 1 part in ~10^6
-    
-    :param n_upper: 
-    :param dens: [cm-3]
-    :param temp: [eV]
-    :param bf: [T]
+    :param n_upper: upper principal quantum number, must be in [3, 7]
+    :param dens: [m-3] density, must be in [10^19, 10^22]
+    :param temp: [eV] temperature, must be in [0.316, 31.6]
+    :param bfield: [T] magnetic field strength, must be in [0, 5[
     :param viewangle: [deg]
-    :param wmax: max detuning [eV]
-    :param npts: length of detuning axis
+    :param wavelengths: [m] input wavelength axis
+    :param display: bool.
     
     :return: 
     """
 
-    assert dens > dens_grid[0] and dens < dens_grid[-1]
-    assert temp > temp_grid[0] and temp < temp_grid[-1]
-    assert bf >= bfield_grid[0] and bf < bfield_grid[-1]
+    dens *= 1e-6
 
-    w_arr = np.zeros([2, 2, 2, 2, 1000])
+    centre_m = pystark.get_NIST_balmer_wavelength(n_upper)
+    centre_ev = c * h / (e * centre_m)
+    centre_hz = c / centre_m
 
-    ls_arr = np.zeros([2, 2, 2, 2, 1000])
-    ls_arr2 = np.zeros([2, 2, 2, 2, npts])
-    ls_arr3 = np.zeros([2, 2, 2, npts])
-    ls_arr4 = np.zeros([2, npts])
-    ls = np.zeros(npts)
+    print(centre_m)
+    # wavelengths [m] -> [eV]
+    interp_wavelengths_ev = c * h / (e * wavelengths)
 
-    # find upper and lower bounding indices for the relevant parameter grids
-    temp_1_idx = np.argmax(temp_grid > temp)
-    temp_0_idx = temp_1_idx - 1
-    temp_idxs = [temp_0_idx, temp_1_idx]
+    wmax = np.max(abs(interp_wavelengths_ev - centre_ev))  # [ev] furthest point from the centre required in the interpolation
+    npts = 1001  # must be odd
 
-    dens_1_idx = np.argmax(dens_grid > dens)
-    dens_0_idx = dens_1_idx - 1
-    dens_idxs = [dens_0_idx, dens_1_idx]
+    ##### Stark-Zeeman lineshape #####
 
-    bfield_ub_idx = np.argmax(bfield_grid > bf)
-    bfield_lb_idx = bfield_ub_idx - 1
-    bfield_idxs = [bfield_lb_idx, bfield_ub_idx]
+    detunings_sz_ev, ls_sz_ev = rosato_stark_zeeman_profile(n_upper, dens, temp, bfield, viewangle, wmax, npts)
+    detunings_sz_hz = e * detunings_sz_ev / h
+    ls_sz_hz = ls_sz_ev * h / e
 
-    # load all data from .txt files necessary for the interpolation
-    for i_angle in range(2):
-        for i_dens in range(2):
-            for i_temp in range(2):
-                if i_dens * i_temp == 1:
-                    break
-                    # break ensures that only the necessary lineshape data is loaded (i_dens = 1, i_temp = 1 is not used)
-                for i_bfield in range(2):
-                    w_arr[i_dens, i_temp, i_bfield, i_angle, :], ls_arr[i_dens, i_temp, i_bfield, i_angle, :] \
-                        = read_single_file(n_upper, dens_idxs[i_dens], temp_idxs[i_temp], bfield_idxs[i_bfield], i_angle)
+    # generate a larger, convolution axis -- avoiding any
+    # unwanted edge effects from the convolution.
 
-    # user-defined detunings grid
-    detuning_axis = np.linspace(-wmax, wmax, npts)
+    d_ev = detunings_sz_ev[-1] - detunings_sz_ev[-2]
+    num_extra_points = 100
+    detunings_sz_ev_extended = np.linspace((-wmax - (num_extra_points / 2) * d_ev),
+                                           (wmax + (num_extra_points / 2) * d_ev), npts + num_extra_points)
+    detunings_sz_hz_extended = e * detunings_sz_ev_extended / h
 
-    # interpolation
-    if bfield_ub_idx != 1:
-        for i_angle in range(2):
-            for i, w in enumerate(detuning_axis):
-                for i_dens in range(2):
-                    for i_temp in range(2):
-                        if i_dens * i_temp == 1:
-                            break
-                            # break ensures that only the necessary lineshape data is loaded (i_dens = 1, i_temp = 1 is not used)
-                        for i_bfield in range(2):
-                            for iw in range(1000):
-                                if w < (w_arr[i_dens, i_temp, i_bfield, i_angle, iw] * bf / bfield_grid[bfield_ub_idx - 1 + i_bfield]):
-                                    break  # ensures that the lineshape is zero outside of the tabulated detuning values
+    ##### Doppler lineshape #####
+    temp_k = temp * e / k
+    mass_kg = physical_constants['deuteron mass'][0]
+    v_th = np.sqrt(2 * k * temp_k / mass_kg)
+    sigma_gauss_hz = v_th * centre_hz / (np.sqrt(2) * c)
+    ls_d_hz = (centre_hz ** -1) * ((np.pi * (v_th ** 2 / (c ** 2))) ** -0.5) * np.exp(-(((detunings_sz_hz_extended) ** 2) / (2 * sigma_gauss_hz ** 2)))
 
-                            if iw != 0 and iw < 999:
-                                ls_arr2[i_dens, i_temp, i_bfield, i_angle, i] = ls_arr[i_dens, i_temp, i_bfield, i_angle, iw -1] + \
-                                          (w * bfield_grid[bfield_ub_idx - 1 + i_bfield] / bf - w_arr[i_dens, i_temp, i_bfield, i_angle, iw - 1]) * \
-                                          (ls_arr[i_dens, i_temp, i_bfield, i_angle, iw] -ls_arr[i_dens, i_temp, i_bfield, i_angle, iw - 1]) / \
-                                (w_arr[i_dens, i_temp, i_bfield, i_angle, iw] - w_arr[i_dens, i_temp, i_bfield, i_angle, iw - 1])
+    # convolution -- in frequency space
+    ls_szd_hz = conv(ls_sz_hz, ls_d_hz, 'same')
+    detunings_szd_hz = detunings_sz_hz
+    ls_szd_hz /= np.trapz(ls_szd_hz, detunings_szd_hz)  # normalise
 
-                        # interpolation in B-field (equ. 3) TODO: CLEAN UP
-                        ls_arr3[i_dens, i_temp, i_angle, i] = ((bf - bfield_grid[bfield_ub_idx - 1]) / (bfield_grid[bfield_ub_idx] - bfield_grid[bfield_ub_idx - 1])) * \
-                                                     (bfield_grid[bfield_ub_idx] / bf) * ls_arr2[i_dens, i_temp, 1, i_angle, i] + \
-                                                     ((bfield_grid[bfield_ub_idx] - bf) / (bfield_grid[bfield_ub_idx] - bfield_grid[bfield_ub_idx - 1])) * \
-                                                     (bfield_grid[bfield_ub_idx - 1] / bf) * ls_arr2[i_dens, i_temp, 0, i_angle, i]
+    # convert to wavelength
+    detunings_szd_m = c * detunings_szd_hz / (detunings_szd_hz + centre_hz) ** 2
+    ls_szd_m = c * ls_szd_hz / (detunings_szd_m + centre_m) ** 2
 
-    elif bf == 0.:
-        for i, w in enumerate(detuning_axis):
-            for i_angle in range(2):
-                for i_dens in range(2):
-                    for i_temp in range(2):
-                        if i_dens * i_temp == 1:
-                            break
-                            # break ensures that only the necessary lineshape data is loaded (i_dens = 1, i_temp = 1 is not used)
-                        for iw in range(1000):
-                            if w < w_arr[i_dens, i_temp, 0, i_angle, iw]:
-                                break  # ensures that the lineshape is zero outside of the tabulated detuning values
+    # interpolate onto input axis
+    ls_szd_m_interp = np.interp(wavelengths, detunings_szd_m + centre_m, ls_szd_m)
 
-                        if iw != 0 and iw < 999:
-                            ls_arr2[i_dens, i_temp, 0, i_angle, i] = ls_arr[i_dens, i_temp, 0, i_angle, iw - 1] + \
-                                                               (w - w_arr[i_dens, i_temp, 0, i_angle, iw - 1]) * \
-                                                               (ls_arr[i_dens, i_temp, 0, i_angle, iw] - ls_arr[i_dens,i_temp, 0, i_angle, iw-1])	/ \
-                                                               (w_arr[i_dens, i_temp, 0, i_angle, iw] - w_arr[i_dens, i_temp, 0, i_angle, iw-1])
+    if display:
+        # interpolate other components onto input axis for display
 
-                        ls_arr3[i_dens, i_temp, i_angle, i] = ls_arr2[i_dens, i_temp, 0, i_angle, i]
+        # Stark-Zeeman
+        detunings_sz_m = c * detunings_sz_hz / (detunings_sz_hz + centre_hz) ** 2
+        ls_sz_m = c * ls_sz_hz / (detunings_sz_m + centre_m) ** 2
+        ls_sz_m_interp = np.interp(wavelengths, detunings_sz_m + centre_m, ls_sz_m)
 
-    else:
-        for i, w in enumerate(detuning_axis):
-            for i_angle in range(2):
-                for i_dens in range(2):
-                    for i_temp in range(2):
-                        if i_dens * i_temp == 1:
-                            break
-                            # break ensures that only the necessary lineshape data is loaded (i_dens = 1, i_temp = 1 is not used)
-                        for iw in range(1000):
-                            if w < w_arr[i_dens, i_temp, 0, i_angle, iw]:
-                                break  # ensures that the lineshape is zero outside of the tabulated detuning values
+        # Doppler
+        detunings_sz_m_extended = c * detunings_sz_hz_extended / (detunings_sz_hz_extended + centre_hz) ** 2
+        ls_d_m = c * ls_d_hz / (detunings_sz_m_extended + centre_m) ** 2
+        ls_d_m_interp = np.interp(wavelengths, detunings_sz_m_extended + centre_m, ls_d_m)
 
-                        if iw != 0 and iw < 999:
-                            ls_arr2[i_dens, i_temp, 0, i_angle, i] =	ls_arr[i_dens, i_temp, 0, i_angle, iw-1] + (w-w_arr[i_dens, i_temp, 0, i_angle, iw-1]) * \
-                                                            (ls_arr[i_dens, i_temp, 0, i_angle, iw] - ls_arr[i_dens, i_temp, 0, i_angle, iw-1]) / \
-                                                            (w_arr[i_dens, i_temp, 0, i_angle, iw] - w_arr[i_dens, i_temp, 0, i_angle, iw-1])
-                        for iw in range(1000):
-                            if w < (w_arr[i_dens, i_temp, 1, i_angle, iw] * bf / bfield_grid[1]):
-                                break
+        # plot
+        fsize=14
+        wavelengths_nm = wavelengths * 1e9
+        fig1 = plt.figure()
+        ax1 = fig1.add_subplot(111)
+        ax1.plot(wavelengths_nm, ls_szd_m_interp, label='Stark-Zeeman-Doppler')
+        ax1.plot(wavelengths_nm, ls_sz_m_interp, label='Stark-Zeeman')
+        ax1.plot(wavelengths_nm, ls_d_m_interp, label='Doppler')
 
-                        if iw != 0 and iw < 999:
-                            ls_arr2[i_dens, i_temp, 1, i_angle, i] = ls_arr[i_dens, i_temp, 1, i_angle, iw - 1] + \
-                                                            (w * bfield_grid[1] / bf - w_arr[i_dens, i_temp, 1, i_angle, iw - 1]) * \
-                                                            (ls_arr[i_dens, i_temp, 1, i_angle, iw] - ls_arr[i_dens, i_temp, 1, i_angle, iw - 1]) / \
-                                                            (w_arr[i_dens, i_temp, 1, i_angle, iw] - w_arr[i_dens, i_temp, 1, i_angle, iw - 1])
-
-                        ls_arr3[i_dens, i_temp, i_angle, i] = ((bf - bfield_grid[bfield_ub_idx - 1]) / (bfield_grid[bfield_ub_idx] - bfield_grid[bfield_ub_idx - 1])) * \
-                                                     (bfield_grid[bfield_ub_idx] / bf) * ls_arr2[i_dens, i_temp, 1, i_angle, i] + \
-                                                     ((bfield_grid[bfield_ub_idx] - bf) / (bfield_grid[bfield_ub_idx] - bfield_grid[bfield_ub_idx - 1])) * \
-                                                     ls_arr2[i_dens, i_temp, 0, i_angle, i]
-
-    # interpolation in density and temperature (equ. 2)
+        leg = ax1.legend(fontsize=fsize)
+        ax1.set_xlabel('wavelength (nm)', size=fsize)
+        ax1.set_ylabel('normalised lineshape', size=fsize)
+        plt.show()
 
 
-    # for i, w in enumerate(detuning_axis):  # can be vectorised
-    #     for i_angle in range(2):
-    #         print(i, i_angle, dens_1_idx - 1, temp_1_idx - 1)
-    #         ls_arr4[i_angle, i] = 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) * ls_arr3[1, 0, i_angle, i] + \
-    #                 2. * np.log10(temp / temp_grid[temp_1_idx - 1]) * ls_arr3[0, 1, i_angle, i] + \
-    #                 (1. - 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) - 2. * np.log10(temp / temp_grid[temp_1_idx - 1])) * ls_arr3[0, 0, i_angle, i]
+    return ls_szd_m_interp
 
-    ls_arr4[:, :] = 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) * ls_arr3[1, 0, :, :] + \
-                          2. * np.log10(temp / temp_grid[temp_1_idx - 1]) * ls_arr3[0, 1, :, :] + \
-                          (1. - 3. * np.log10(dens / dens_grid[dens_1_idx - 1]) - 2. * np.log10(
-                              temp / temp_grid[temp_1_idx - 1])) * ls_arr3[0, 0, :, :]
 
-    # account for view angle (section 3)
-    viewangle *= 3.141593 / 180.  # np.pi / 180  # [deg] to [rad]
+def rosato_stark_zeeman_profile(n_upper, dens, temp, bfield, viewangle, wmax, npts, display=False):
+    """
+     Stark-Zeeman lineshape profile for the first Balmer lines, interpolated from the Rosato et al. data.
+    
+    Essentially a python wrapper for the LS_READ_data.f90
+    
+    :param n_upper: upper principal quantum number
+    :param dens: [cm-3]
+    :param temp: [eV]
+    :param bfield: [T]
+    :param viewangle: [deg] 
+    :param wmax: [eV]
+    :param npts: 
+    :param display: bool.
+    :return: 
+    """
+    balmer_line_names = ['-', '-', '-', 'D_alpha', 'D_beta', 'D_gamma', 'D_delta', 'D_epsilon']
+    # list index gives transition n_upper
 
-    # for i, w in enumerate(detuning_axis):  # can be vectorised
-    #     ls[i] = ls_arr4[0, i] * np.sin(viewangle) ** 2 + ls_arr4[1, i] * np.cos(viewangle) ** 2
+    detunings_axis = np.linspace(-wmax, wmax, npts)
 
-    ls = ls_arr4[0, :] * np.sin(viewangle) ** 2 + ls_arr4[1, :] * np.cos(viewangle) ** 2
+    # overwrite the in.txt fortran input file -- is this necessary?
+    dir_in = os.path.join(pystark.paths.rosato_path).encode('utf-8')
+    LS_DATA_read_f2py.in_param(len(dir_in), dir_in, n_upper, dens, temp, bfield, viewangle, wmax, npts)
 
+    # get the parameter grid bound indices
+    iN, iT, iB = LS_DATA_read_f2py.set_bounds(dens, temp, bfield)
+
+    viewangle_idxs = [0, 1]
+    viewangle_rad = viewangle * np.pi / 180
+    ls = np.zeros([npts, 2])
+
+    for i, viewangle_idx in enumerate(viewangle_idxs):
+        name = LS_DATA_read_f2py.set_name_file(n_upper, iN, iT, iB, viewangle_idx)
+
+        # replace the original 'dir' outputted from LS_DATA_read with one that is defined using the full path
+        # -- this step could cause headaches later on, but allows fn to be called from anywhere.
+
+        dir = os.path.join(pystark.paths.rosato_database_path, balmer_line_names[n_upper] + '/').encode('utf-8')
+
+        w_arr, ls_arr = LS_DATA_read_f2py.read_file(len(dir), dir, name)
+        ls[:, i] = LS_DATA_read_f2py.ls_interpol(n_upper, dens, temp, bfield, wmax, npts, w_arr, ls_arr, iN, iT, iB)
+
+    ls = ls[:, 0] * np.sin(viewangle_rad) ** 2 + ls[:, 1] * np.cos(viewangle_rad) ** 2
 
     if display:
         plt.figure()
-        plt.plot(detuning_axis, ls)
+        plt.plot(detunings_axis, ls)
         plt.ylabel('ls')
         plt.xlabel('Detuning (eV)')
+        # plt.semilogy()
         plt.show()
 
-    return detuning_axis, ls
+    return detunings_axis, ls
 
-
-
-def read_single_file(n_upper, dens_idx, temp_idx, bfield_idx, viewangle_idx):
-    """ Given the indices of the plasma parameter grids, load the lineshape from file.
-    
-    indexing inputs begins at 0 here, whereas in the filenames it begins at 1 ...except for viewangle...
-    
-    :param n_upper: integer within [3, 7]
-    :param dens_idx: integer within [0, 9]
-    :param temp_idx: integer within [0, 4]
-    :param bfield_idx: integer within [0, 5]
-    :param viewangle_idx: [0, 1]
-    :return: 
-    """
-
-    balmer_line_names = ['-', '-', '-', 'D_alpha', 'D_beta', 'D_gamma', 'D_delta',
-                         'D_epsilon']  # list index gives transition n_upper
-
-    load_dir_path = os.path.join(pystark.paths.rosato_database_path, balmer_line_names[n_upper])
-    filename = 'ls%02d' % (dens_idx + 1,) + str(temp_idx + 1) + str(bfield_idx + 1) + str(viewangle_idx) + '.txt'
-    load_file_path = os.path.join(load_dir_path, filename)
-
-    arr = np.loadtxt(load_file_path)
-
-    return arr[:, 0], arr[:, 1]
 
 
 if __name__ == '__main__':
-    # read_single_file(3, 9, 3, 5, 1, display=True)
-
-    x, y = rosato_stark_zeeman_profile(4, 2.41e15, 1.22, 2.25, 86.2, 5e-3, 1000, display=True)
+    s = time.time()
+    wls = np.linspace(656, 657, 1000) * 1e-9
+    rosato_profile(3, 5.e19, 3.16, 4.99, 90., wls, display=False)
+    e = time.time()
+    print(e - s, 'sec')
+    # x, y = rosato_stark_zeeman_profile(3, 2.41e15, 3., 5., 86.2, 1.e-1, 10001, display=True)

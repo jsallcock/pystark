@@ -4,35 +4,60 @@ import matplotlib.pyplot as plt
 
 
 def plot_comparison():
-    """ Demo script, compare the Stehle lineshape with a Voigt profile (based on Griem's FWHM density scaling) and  """
-    args = (4, 2, 1., 1.e20)  # (n_upper, n_lower, temperature [eV], Density [m ** -3])
+    """ Demo script compares all lineshape models for Balmer-beta line. """
 
-    x, y, ys = ps.stehle_profile(*args)
+    n_upper = 3
+    n_lower = 2
+    temp = 3.  # [eV]
+    dens = 9.e21  # [m-3]
+    bfield = 0.  # [T]
+    viewangle = 90  # [deg]
 
+    # generate appropriate wavelength axis
 
-    plt.figure()
-    plt.title('$n_e = $' + str(args[3]) + ' m$^{-3}$ \n $T = $' + str(args[2]) + ' eV')
-    plt.plot(x, ps.norm_h(y), '.-', label='Stehle')
+    wl_0 = ps.get_NIST_balmer_wavelength(n_upper)
+    fwhm_voigt_hz, _, _ = ps.estimate_fwhms(n_upper, dens, temp)
+    fwhm_voigt_m = 3e8 * fwhm_voigt_hz / (3e8 / wl_0) ** 2
+
+    wl_axis = np.linspace(wl_0 - 5 * fwhm_voigt_m, wl_0 + 5 * fwhm_voigt_m, 200)
+    wl_axis_nm = wl_axis * 1e9
+
+    display=False
+
+    fig = plt.figure(figsize=[6, 6])
+    fsize=14
+    ax = fig.add_subplot(111)
+    ax.set_title('$n_e = $' + str(dens) + ' m$^{-3}$ \n $T = $' + str(temp) + ' eV \n $B = $' + str(bfield) + ' T')
 
     try:
-        wl_axis, wl_0, lineshape_griem, lineshape_griem_stark, lineshape_griem_doppler = ps.simple_profile(*args, model='griem')
-
-        plt.plot(wl_axis, ps.norm_h(lineshape_griem), lw=1.25, label='Griem-Doppler profile (Voigt)')
-        plt.plot(wl_axis, ps.norm_h(lineshape_griem_stark), ':', lw=0.75, label='Griem profile (Lorentzian)')
-        plt.plot(wl_axis, ps.norm_h(lineshape_griem_doppler), ':', lw=0.75, label='Doppler profile (Gaussian)')
+        ls_stehle = ps.stehle_profile(n_upper, n_lower, temp, dens, wl_axis, display=display)
+        ax.plot(wl_axis_nm, ps.norm_a(ls_stehle, wl_axis), '-', label='Stehle')
     except:
-        print('Griem calculation failed')
+        print('Stehle calculation failed')
 
     try:
-        wl_axis, wl_0, lineshape_loman, lineshape_loman_stark, lineshape_loman_doppler = ps.simple_profile(*args, model='lomanowski')
-        plt.plot(wl_axis, ps.norm_h(lineshape_loman), lw=1.25, label='Lomanowski-Doppler profile (Voigt)')
-        plt.plot(wl_axis, ps.norm_h(lineshape_loman_stark), ':', lw=0.75, label='Lomanowski profile (Lorentzian)')
+        ls_rosato = ps.rosato_profile(n_upper, dens, temp, bfield, viewangle, wl_axis, display=display)
+        ax.plot(wl_axis_nm, ps.norm_a(ls_rosato, wl_axis), '-', label='Rosato')
+    except:
+        print('Rosato calculation failed')
+
+    try:
+        ls_loman, _, _ = ps.simple_profile(n_upper, n_lower, temp, dens, wl_axis, model='lomanowski')
+        ax.plot(wl_axis_nm, ps.norm_a(ls_loman, wl_axis), '-', label='Lomanowski')
     except:
         print('Lomanowski calculation failed')
 
-    plt.xlim([np.min(wl_axis), np.max(wl_axis)])
-    plt.legend()
-    plt.xlabel('wavelength (m)')
+    try:
+        ls_griem, _, _ = ps.simple_profile(n_upper, n_lower, temp, dens, wl_axis, model='griem')
+        ax.plot(wl_axis_nm, ps.norm_a(ls_griem, wl_axis), '-', label='Griem')
+    except:
+        print('Griem calculation failed')
+
+
+    ax.set_xlim([np.min(wl_axis_nm), np.max(wl_axis_nm)])
+    leg = ax.legend(fontsize=fsize)
+    ax.set_xlabel('wavelength (nm)', size=fsize)
+    # plt.semilogy()
 
     return
 

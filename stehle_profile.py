@@ -1,18 +1,21 @@
 import numpy as np
+import matplotlib.pyplot as plt
+
 import time
 import pystark
 from scipy.constants import *
 
 
-def stehle_profile(n_upper, n_lower, temperature, density):
+def stehle_profile(n_upper, n_lower, temperature, density, wavelengths, display=False):
     """  Stark-broadened lineshape.
     
     :param n_upper: upper principal quantum number
     :param n_lower: lower principal quantum number
     :param temperature: in eV
     :param density: in m ** -3
+    :param wavelengths: [m] input wavelength axis
     
-    :return: wl_axis, lineshape_m, wprofs_nu2
+    :return: lineshape_m, wprofs_nu2
     """
 
     # ensure given n_upper + n_lower fall within tabulated values
@@ -69,10 +72,10 @@ def stehle_profile(n_upper, n_lower, temperature, density):
     # calculate line centre wavelength and frequency using Rydberg formula
     # JSA: I have made this step clearer and corrected for deuteron mass in the Rydberg constant (though the effect is small)
     # TODO make sure this matches olam0 parameter above -- why were there two variables in the first place?!
-    rydberg_m = Rydberg / (1. + (electron_mass / physical_constants['deuteron mass'][0]))
-    wl_0_angst = 1e10 * (rydberg_m * (1 / n_lower ** 2 - 1 / n_upper ** 2)) ** -1
+    # rydberg_m = Rydberg / (1. + (electron_mass / physical_constants['deuteron mass'][0]))
+    # wl_0_angst = 1e10 * (rydberg_m * (1 / n_lower ** 2 - 1 / n_upper ** 2)) ** -1
 
-    # wl_0_angst = pystark.tools.get_NIST_balmer_wavelength(n_upper) * 1e10
+    wl_0_angst = pystark.tools.get_NIST_balmer_wavelength(n_upper) * 1e10
 
     c_angst = c * 1e10  # velocity of light in Ansgtroms / s
     angular_freq_0 = 2 * np.pi * c_angst/ wl_0_angst  # rad / s
@@ -285,20 +288,26 @@ def stehle_profile(n_upper, n_lower, temperature, density):
         wprofs_nu[i] = (wprofs / normal_holtsmark_field) * (2. * np.pi)
         #        print '%e %e %e %e' %(delta_lambda[i],delta_nu[i],wprof_nu[i],wprofs_nu[i])
 
-    delta_lambda2 = np.concatenate((-delta_lambda[::-1], delta_lambda)) + olam0
+    delta_lambda2 = np.concatenate((-delta_lambda[::-1], delta_lambda)) + wl_0_angst #+ olam0
     #    delta_nu2 = np.concatenate((-delta_nu[::-1],delta_nu))
     wprof_nu2 = np.concatenate((wprof_nu[::-1], wprof_nu))
     wprofs_nu2 = np.concatenate((wprofs_nu[::-1], wprofs_nu))
 
-    # end = time.time()
-    # print('Time elapsed (s): ', end - start)
 
     # area normalise and convert wavelength units to m:
     wl_axis = delta_lambda2 * 1e-10
     lineshape_m = wprof_nu2 / np.trapz(wprof_nu2, wl_axis)
 
+    # interpolate onto input axis
+    ls_m_interp = np.interp(wavelengths, wl_axis, lineshape_m)
 
-    return wl_axis, lineshape_m, wprofs_nu2
+    if display:
+        plt.figure()
+        plt.plot(wl_axis, lineshape_m)
+        plt.plot(wavelengths, ls_m_interp)
+        plt.show()
+
+    return ls_m_interp
 
 
 def FINTRP(x1, x2, x3, y1, y2, y3, x):
@@ -333,3 +342,8 @@ def FINTRP(x1, x2, x3, y1, y2, y3, x):
         b = (-a21 * v1 + a11 * v2) / deter
         c = y1 - a * x1c - b * x1
         return (a * x + b) * x + c
+
+if __name__ == '__main__':
+    wls = np.linspace(485, 487, 1000) * 1e-9
+    a, b = stehle_profile(4, 2, 1.5, 1e20, wls, display=True)
+

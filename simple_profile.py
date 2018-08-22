@@ -1,10 +1,11 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import pystark
 from scipy.constants import *
 from scipy.signal import fftconvolve as conv
 
 
-def simple_profile(n_upper, n_lower, temperature, density, len_axis=20001, spectrum='wavelength', model='lomanowski'):
+def simple_profile(n_upper, n_lower, temperature, density, wavelengths, model='lomanowski', display=False):
     """ Approximate Stark-broadened line profile, area-normalised to 1.
 
      use mode='griem' for a Lorentzian Stark profile that follows Griem's density scaling:
@@ -23,12 +24,7 @@ def simple_profile(n_upper, n_lower, temperature, density, len_axis=20001, spect
 
     """
 
-    # ensure odd length axis
-    assert len_axis % 2 != 0
-
     valid_n_upper = [3, 4, 5, 6, 7, 8, 10]
-
-    # lomanowski_valid_n_upper = []
     assert n_upper in valid_n_upper
 
     valid_modes = ['griem', 'lomanowski']
@@ -37,7 +33,7 @@ def simple_profile(n_upper, n_lower, temperature, density, len_axis=20001, spect
     # line centre wavelength from NIST
     # prefix = 'n_' + str(n_upper) + '_' + str(n_lower) + '_'
     # wl_0 = pystark.nc.variables[prefix + 'olam0'].data[0] * 1e-10  # line centre wavlength (m)
-    wl_0 = pystark.get_stehle_balmer_wavelength(n_upper)
+    wl_0 = pystark.get_NIST_balmer_wavelength(n_upper)
     wl_0_nm = wl_0 * 1e9
     freq_0 = c / wl_0
 
@@ -47,14 +43,13 @@ def simple_profile(n_upper, n_lower, temperature, density, len_axis=20001, spect
     sigma_gauss_hz = fwhm_gauss_hz / (2 * np.sqrt(2 * np.log(2)))
 
     # generate frequency and wavelength axes
-    num_fwhm = 200
-    # len_axis = 20001  # odd number of points such that nu_0 lies exactly at the array centre.
+    num_fwhm = 20
+    len_axis = 2001  # odd number of points such that nu_0 lies exactly at the array centre.
     min_freq, max_freq = (freq_0 - num_fwhm * fwhm_voigt_hz, freq_0 + num_fwhm * fwhm_voigt_hz)
     freq_axis = np.linspace(min_freq, max_freq, len_axis)
 
     min_wl, max_wl = (c / max_freq, c / min_freq)
     wl_axis = np.linspace(min_wl, max_wl, len_axis)
-    wl_axis_nm = wl_axis * 1e9
 
     # generate a larger, convolution axis -- this avoids any
     # unwanted edge effects from the convolution.
@@ -158,22 +153,25 @@ def simple_profile(n_upper, n_lower, temperature, density, len_axis=20001, spect
     voigt_lineshape_hz = conv(stark_lineshape_hz, doppler_lineshape_hz, 'same')
     voigt_lineshape_hz /= np.trapz(voigt_lineshape_hz, freq_axis_conv)  # normalise
 
+    doppler_lineshape_m = np.interp(wavelengths, c / freq_axis_conv[::-1], doppler_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
+    stark_lineshape_m = np.interp(wavelengths, c / freq_axis_conv[::-1], stark_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
+    voigt_lineshape_m = np.interp(wavelengths, c / freq_axis_conv[::-1], voigt_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
 
-    # return spectra in wavelength or frequency:
-    assert spectrum in ['wavelength', 'frequency']
+    if display:
 
-    if spectrum == 'wavelength':
+        # plot
+        fsize=14
+        wavelengths_nm = wavelengths * 1e9
+        fig1 = plt.figure()
+        ax1 = fig1.add_subplot(111)
+        ax1.plot(wavelengths_nm, doppler_lineshape_m, label='Doppler')
+        ax1.plot(wavelengths_nm, stark_lineshape_m, label='Stark')
+        ax1.plot(wavelengths_nm, voigt_lineshape_m, label='Stark-Doppler')
 
-        doppler_lineshape_m = np.interp(wl_axis, c / freq_axis_conv[::-1], doppler_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
-        stark_lineshape_m = np.interp(wl_axis, c / freq_axis_conv[::-1], stark_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
-        voigt_lineshape_m = np.interp(wl_axis, c / freq_axis_conv[::-1], voigt_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
+        leg = ax1.legend(fontsize=fsize)
+        ax1.set_xlabel('wavelength (nm)', size=fsize)
+        ax1.set_ylabel('normalised lineshape', size=fsize)
+        plt.show()
 
-        return wl_axis, wl_0, voigt_lineshape_m, stark_lineshape_m, doppler_lineshape_m
+    return voigt_lineshape_m, stark_lineshape_m, doppler_lineshape_m
 
-    elif spectrum == 'frequency':
-
-        doppler_lineshape_hz = np.interp(freq_axis, freq_axis_conv, doppler_lineshape_hz)
-        stark_lineshape_hz = np.interp(freq_axis, freq_axis_conv, stark_lineshape_hz)
-        voigt_lineshape_hz = np.interp(freq_axis, freq_axis_conv, voigt_lineshape_hz)
-
-        return freq_axis, freq_0, voigt_lineshape_hz, stark_lineshape_hz, doppler_lineshape_hz
