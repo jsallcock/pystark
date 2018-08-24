@@ -35,7 +35,6 @@ def rosato_profile(n_upper, dens, temp, bfield, viewangle, wavelengths, display=
     centre_ev = c * h / (e * centre_m)
     centre_hz = c / centre_m
 
-    print(centre_m)
     # wavelengths [m] -> [eV]
     interp_wavelengths_ev = c * h / (e * wavelengths)
 
@@ -169,5 +168,5 @@ if __name__ == '__main__':
     wls = np.linspace(656, 657, 1000) * 1e-9
     rosato_profile(3, 5.e19, 3.16, 4.99, 90., wls, display=False)
     e = time.time()
-    print(e - s, 'sec')
+    # print(e - s, 'sec')
     # x, y = rosato_stark_zeeman_profile(3, 2.41e15, 3., 5., 86.2, 1.e-1, 10001, display=True)
