@@ -12,7 +12,7 @@ sys.path.insert(0, pystark.paths.rosato_path)
 import LS_DATA_read_f2py  # this is the shared object generated using the fortran subroutines in LS_DATA_read_f2py.f90
 
 
-def rosato_profile(n_upper, dens, temp, bfield, viewangle, wavelengths, display=False):
+def rosato_profile(n_upper, dens, temp, bfield, viewangle, wavelengths, line_centre=None, display=False):
     """ Stark-Zeeman-Doppler lineshape profile for the first Balmer lines, interpolated from the Rosato et al. data 
     tables.
     
@@ -24,6 +24,7 @@ def rosato_profile(n_upper, dens, temp, bfield, viewangle, wavelengths, display=
     :param bfield: [T] magnetic field strength, must be in [0, 5[
     :param viewangle: [deg]
     :param wavelengths: [m] input wavelength axis
+    :param line_centre: [m] line centre wavelength, optional.
     :param display: bool.
     
     :return: 
@@ -31,7 +32,12 @@ def rosato_profile(n_upper, dens, temp, bfield, viewangle, wavelengths, display=
 
     dens *= 1e-6
 
-    centre_m = pystark.get_NIST_balmer_wavelength(n_upper)
+    if line_centre is None:
+        # Use the NIST value for chosen Balmer line.
+        centre_m = pystark.get_NIST_balmer_wavelength(n_upper)
+    else:
+        centre_m = line_centre
+
     centre_ev = c * h / (e * centre_m)
     centre_hz = c / centre_m
 
