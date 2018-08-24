@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 
 
 def plot_comparison():
-    """ Demo script compares all lineshape models for Balmer-beta line. """
+    """ Demo script compares all lineshape models for selected Balmer line. """
 
-    n_upper = 3
+    n_upper = 5
     n_lower = 2
-    temp = 3.  # [eV]
-    dens = 9.e21  # [m-3]
+    temp = 10.  # [eV]
+    dens = 1e19  # [m-3]
     bfield = 0.  # [T]
-    viewangle = 90  # [deg]
+    viewangle = 0  # [deg]
 
     # generate appropriate wavelength axis
 
