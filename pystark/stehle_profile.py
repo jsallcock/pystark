@@ -26,7 +26,7 @@ def stehle_profile(n_upper, n_lower, temperature, density, wavelengths, display=
     dens_cm = density * 1.e-6  # electronic density in cm-3
     prefix = 'n_' + str(n_upper) + '_' + str(n_lower) + '_'
 
-    # extract raw tabulated data
+    # extract raw tabulated tabulated_data
     tab_temp_k = np.array(pystark.nc.variables[prefix + 'tempe'].data)  # tabulated electron temperatures (K)
     olam0 = pystark.nc.variables[prefix + 'olam0'].data  # line centre wavelength (A)
     num_tab_dens = pystark.nc.variables[prefix + 'id_max'].data
@@ -85,7 +85,7 @@ def stehle_profile(n_upper, n_lower, temperature, density, wavelengths, display=
     olines = o1lines / np.abs(otrans)
     oline = o1line / np.abs(otrans)
 
-    # Limit analysis to uncorrelated plasmas.
+    # Limit analysis_tools to uncorrelated plasmas.
     # check that mean interelectronic distance is smaller than the electronic Debye length (equ. 10)
     PR0_exp = 0.0898 * (dens_cm ** (1. / 6.)) / np.sqrt(temp_k)  # = (r0 / debye)
     if PR0_exp > 1.:

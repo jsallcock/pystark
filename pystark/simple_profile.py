@@ -14,7 +14,7 @@ def simple_profile(n_upper, n_lower, temperature, density, wavelengths, model='l
     - Unverified for n_e > 10 ** 21 m ** -3
 
 
-    use mode='lomanowski' for B. Lomanowski's parameterised Stark profile, based on Stehle's tabulated data.
+    use mode='lomanowski' for B. Lomanowski's parameterised Stark profile, based on Stehle's tabulated tabulated_data.
 
     :param n_upper: upper principal quantum number
     :param n_lower: lower principal quantum number
@@ -32,14 +32,13 @@ def simple_profile(n_upper, n_lower, temperature, density, wavelengths, model='l
 
     # line centre wavelength from NIST
     # prefix = 'n_' + str(n_upper) + '_' + str(n_lower) + '_'
-    # wl_0 = pystark.nc.variables[prefix + 'olam0'].data[0] * 1e-10  # line centre wavlength (m)
+    # wl_0 = pystark.nc.variables[prefix + 'olam0'].tabulated_data[0] * 1e-10  # line centre wavlength (m)
     wl_0 = pystark.get_NIST_balmer_wavelength(n_upper)
     wl_0_nm = wl_0 * 1e9
     freq_0 = c / wl_0
 
     # ----- approximate FWHM of Voigt profile to dynamically generate frequency axis
     fwhm_voigt_hz, fwhm_lorentz_hz, fwhm_gauss_hz = pystark.estimate_fwhms(n_upper, density, temperature)
-    print(fwhm_voigt_hz * c / freq_0 ** 2)
     sigma_gauss_hz = fwhm_gauss_hz / (2 * np.sqrt(2 * np.log(2)))
 
     # generate frequency and wavelength axes
@@ -143,19 +142,19 @@ def simple_profile(n_upper, n_lower, temperature, density, wavelengths, model='l
 
         delta_lambda_12ij = c_ij * (density ** a_ij) / (temperature ** b_ij)  # nm
 
-        stark_lineshape_m = 1 / (abs(wl_axis_conv_nm - wl_0_nm) ** (5. / 2.) + (delta_lambda_12ij / 2) ** (5. / 2.))
-        stark_lineshape_m /= np.trapz(stark_lineshape_m, wl_axis_conv)
+        s_lineshape_m = 1 / (abs(wl_axis_conv_nm - wl_0_nm) ** (5. / 2.) + (delta_lambda_12ij / 2) ** (5. / 2.))
+        s_lineshape_m /= np.trapz(s_lineshape_m, wl_axis_conv)
 
-        stark_lineshape_hz = np.interp(freq_axis_conv, c / wl_axis_conv[::-1], stark_lineshape_m[::-1] * (wl_axis_conv ** 2 / c))
+        stark_lineshape_hz = np.interp(freq_axis_conv, c / wl_axis_conv[::-1], s_lineshape_m[::-1] * (wl_axis_conv ** 2 / c))
 
     # Voigt lineshape
     # voigt_lineshape_hz = np.convolve(stark_lineshape_hz, doppler_lineshape_hz, 'same')
     voigt_lineshape_hz = conv(stark_lineshape_hz, doppler_lineshape_hz, 'same')
     voigt_lineshape_hz /= np.trapz(voigt_lineshape_hz, freq_axis_conv)  # normalise
 
-    doppler_lineshape_m = np.interp(wavelengths, c / freq_axis_conv[::-1], doppler_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
-    stark_lineshape_m = np.interp(wavelengths, c / freq_axis_conv[::-1], stark_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
-    voigt_lineshape_m = np.interp(wavelengths, c / freq_axis_conv[::-1], voigt_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
+    d_lineshape_m = np.interp(wavelengths, c / freq_axis_conv[::-1], doppler_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
+    s_lineshape_m = np.interp(wavelengths, c / freq_axis_conv[::-1], stark_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
+    sd_lineshape_m = np.interp(wavelengths, c / freq_axis_conv[::-1], voigt_lineshape_hz[::-1] * freq_axis_conv ** 2 / c)
 
     if display:
 
@@ -164,14 +163,14 @@ def simple_profile(n_upper, n_lower, temperature, density, wavelengths, model='l
         wavelengths_nm = wavelengths * 1e9
         fig1 = plt.figure()
         ax1 = fig1.add_subplot(111)
-        ax1.plot(wavelengths_nm, doppler_lineshape_m, label='Doppler')
-        ax1.plot(wavelengths_nm, stark_lineshape_m, label='Stark')
-        ax1.plot(wavelengths_nm, voigt_lineshape_m, label='Stark-Doppler')
+        ax1.plot(wavelengths_nm, d_lineshape_m, label='Doppler')
+        ax1.plot(wavelengths_nm, s_lineshape_m, label='Stark')
+        ax1.plot(wavelengths_nm, sd_lineshape_m, label='Stark-Doppler')
 
         leg = ax1.legend(fontsize=fsize)
         ax1.set_xlabel('wavelength (nm)', size=fsize)
         ax1.set_ylabel('normalised lineshape', size=fsize)
         plt.show()
 
-    return voigt_lineshape_m, stark_lineshape_m, doppler_lineshape_m
+    return sd_lineshape_m, s_lineshape_m, d_lineshape_m
 

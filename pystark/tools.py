@@ -7,19 +7,24 @@ def find_nearest_idx(array, value):
     array = np.asarray(array)
     return (np.abs(array - value)).argmin()
 
-def generate_frequency_axis(n_upper, n_lower, temperature, density):
-    """ For a given transition and plasma parameters, return a regular frequency axis with sensible bounds using a voigt
-     approximation for the line's FWHM. """
+def generate_wavelength_axis(n_upper, temp, dens, npts=1001):
+    """ For a given Balmer transition and plasma parameters, return a regular wavelength axis with sensible bounds using
+     a voigt approximation for the line's FWHM.
+    
+    :param n_upper: 
+    :param temp: eV
+    :param dens: m^-3
+    :param npts: length of wavelength axis output.
+    :return: 
+    """
 
-    freq_0 = c / get_NIST_balmer_wavelength(n_upper)
-    fwhm_voigt_hz, fwhm_lorentz_hz, fwhm_gauss_hz = estimate_fwhms(n_upper, density, temperature)
-    num_fwhm = 10
-    num_points = 5001  # odd number of points such that nu_0 lies exactly at the array centre.
-    min_freq, max_freq = (freq_0 - num_fwhm * fwhm_voigt_hz, freq_0 + num_fwhm * fwhm_voigt_hz)
-    frequency_axis = np.linspace(min_freq, max_freq, num_points)
+    centre_wl = pystark.get_NIST_balmer_wavelength(n_upper)
+    fwhm_voigt_hz, _, _ = estimate_fwhms(n_upper, dens, temp)
+    fwhm_voigt_m = c * fwhm_voigt_hz / (c / centre_wl) ** 2
 
+    no_fwhm = 30
 
-    return frequency_axis
+    return np.linspace(centre_wl - no_fwhm * fwhm_voigt_m, centre_wl + no_fwhm * fwhm_voigt_m, npts)
 
 
 def estimate_fwhms(n_upper, density, temperature):
@@ -42,7 +47,7 @@ def estimate_fwhms(n_upper, density, temperature):
     fwhm_lorentz_m = 1e-9 * 0.54 * alpha_12 * ne_20 ** (2. / 3.)  # Griem scaling
     fwhm_lorentz_hz = fwhm_lorentz_m * freq_0 ** 2 / c
 
-    # total FWHM: Voigt
+    # total FWHM: Voigt. I think this approximation comes from wikipedia.
     fwhm_voigt_hz = 0.5346 * fwhm_lorentz_hz + np.sqrt(0.2166 * fwhm_lorentz_hz ** 2 + fwhm_gauss_hz ** 2)
 
     return fwhm_voigt_hz, fwhm_lorentz_hz, fwhm_gauss_hz
@@ -60,8 +65,8 @@ def get_stehle_balmer_wavelength(n_upper):
 
     prefix = 'n_' + str(n_upper) + '_' + str(n_lower) + '_'
 
-    # extract raw tabulated data
-    # tab_temp_k = np.array(pystark.nc.variables[prefix + 'tempe'].data)  # tabulated electron temperatures (K)
+    # extract raw tabulated tabulated_data
+    # tab_temp_k = np.array(pystark.nc.variables[prefix + 'tempe'].tabulated_data)  # tabulated electron temperatures (K)
     olam0, = pystark.nc.variables[prefix + 'olam0'].data  # line centre wavelength (A)
 
     olam0 *= 1e-10
@@ -104,8 +109,3 @@ def norm_h(ls):
 def norm_a(ls, x):
     """ area normalise peak to 1. """
     return ls / np.trapz(ls, x)
-
-
-
-if __name__ == '__main__':
-    get_stehle_balmer_wavelength(5)

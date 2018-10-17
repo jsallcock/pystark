@@ -32,6 +32,20 @@ end module
 !	deallocate(ls_perp,ls_par)
 !end program
 !****************************************************************
+subroutine print_string(string_len,string)
+!Reads or generates the input parameters in 'in.txt'. MODIFIED TO ONLY WRITE TO A NEW IN.TXT FILE
+	! added dir input for absolute paths
+	implicit none
+	integer, intent(in)::string_len
+	! this part is a hack to allow absolute paths of varying lengths to be inputted, it could be bad practice, but seems
+	! to work. For strange errors, this is probably a good place to start.
+	character(len=string_len), intent(in) ::string
+
+    print *, string
+    print *, string//'in.txt'
+
+end subroutine
+!****************************************************************
 subroutine in_param(dir_in_len,dir_in,nq,Ne,Te,B,theta,wmax,npts)
 !Reads or generates the input parameters in 'in.txt'. MODIFIED TO ONLY WRITE TO A NEW IN.TXT FILE
 	! added dir input for absolute paths
@@ -39,32 +53,36 @@ subroutine in_param(dir_in_len,dir_in,nq,Ne,Te,B,theta,wmax,npts)
 	integer, intent(in)::dir_in_len
 	! this part is a hack to allow absolute paths of varying lengths to be inputted, it could be bad practice, but seems
 	! to work. For strange errors, this is probably a good place to start.
-	character(dir_in_len), intent(in) ::dir_in
+	character(len=dir_in_len), intent(in) ::dir_in
 	integer, intent(in) ::nq,npts
 	real, intent(in) ::Ne,Te,B,theta,wmax
-	logical::error
-	error=				(nq.le.2).or.(nq.ge.8)			&
-				.or.	(Ne.lt.1.e13).or.(Ne.gt.1.e16)	&
-				.or.	(Te.lt..316).or.(Te.gt.31.6)	&
-				.or.	(B.lt.0.).or.(B.gt.5.)
-	if(error) then
-		write(*,*)'Error!'
-		write(*,*)
-		stop
-	end if
+!	logical::error
 
-	open(unit=20,file=dir_in//'in.txt',status='old')
-	write(20,"('-----------------------------------------------------')")
-	write(20,"('Initial principal quantum number         : ',i8)")nq
-	write(20,"('Density (cm-3)                           : ',es10.2)")Ne
-	write(20,"('Temperature (eV)                         : ',es10.2)")Te
-	write(20,"('Magnetic field (T)                       : ',es10.2)")B
-	write(20,"('Angle (degrees)                          : ',es10.2)")theta
-	write(20,"('-----------------------------------------------------')")
-	write(20,"('Delta_omega max (eV)                     : ',es10.2)")wmax
-	write(20,"('Number of points                         : ',i8)")npts
-	write(20,"('-----------------------------------------------------')")
-	close(20)
+    print *, dir_in
+    print *, dir_in//'in.txt'
+
+!    error=				(nq.le.2).or.(nq.ge.8)			&
+!				.or.	(Ne.lt.1.e13).or.(Ne.gt.1.e16)	&
+!				.or.	(Te.lt..316).or.(Te.gt.31.6)	&
+!				.or.	(B.lt.0.).or.(B.gt.5.)
+!	if(error) then
+!		write(*,*)'Error!'
+!		write(*,*)
+!		stop
+!	end if
+
+!	open(unit=20,file=dir_in//'in.txt',status='old')
+!	write(20,"('-----------------------------------------------------')")
+!	write(20,"('Initial principal quantum number         : ',i8)")nq
+!	write(20,"('Density (cm-3)                           : ',es10.2)")Ne
+!	write(20,"('Temperature (eV)                         : ',es10.2)")Te
+!	write(20,"('Magnetic field (T)                       : ',es10.2)")B
+!	write(20,"('Angle (degrees)                          : ',es10.2)")theta
+!	write(20,"('-----------------------------------------------------')")
+!	write(20,"('Delta_omega max (eV)                     : ',es10.2)")wmax
+!	write(20,"('Number of points                         : ',i8)")npts
+!	write(20,"('-----------------------------------------------------')")
+!	close(20)
 end subroutine
 !****************************************************************
 subroutine set_bounds(Ne,Te,B,iN,iT,iB)

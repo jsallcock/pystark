@@ -5,15 +5,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import e, c, k, h, physical_constants
 from scipy.signal import fftconvolve as conv
-
+from pystark import rosato_path, rosato_database_path
 import pystark
 
-sys.path.insert(0, pystark.paths.rosato_path)
+sys.path.insert(0, rosato_path)
 import LS_DATA_read_f2py  # this is the shared object generated using the fortran subroutines in LS_DATA_read_f2py.f90
 
 
 def rosato_profile(n_upper, dens, temp, bfield, viewangle, wavelengths, line_centre=None, display=False):
-    """ Stark-Zeeman-Doppler lineshape profile for the first Balmer lines, interpolated from the Rosato et al. data 
+    """ Stark-Zeeman-Doppler lineshape profile for the first Balmer lines, interpolated from the Rosato et al. tabulated_data 
     tables.
     
     Ported by Joe Allcock, 08/18.
@@ -114,7 +114,7 @@ def rosato_profile(n_upper, dens, temp, bfield, viewangle, wavelengths, line_cen
 
 def rosato_stark_zeeman_profile(n_upper, dens, temp, bfield, viewangle, wmax, npts, display=False):
     """
-     Stark-Zeeman lineshape profile for the first Balmer lines, interpolated from the Rosato et al. data.
+     Stark-Zeeman lineshape profile for the first Balmer lines, interpolated from the Rosato et al. tabulated_data.
     
     Essentially a python wrapper for the LS_READ_data.f90
     
@@ -134,8 +134,12 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bfield, viewangle, wmax, np
     detunings_axis = np.linspace(-wmax, wmax, npts)
 
     # overwrite the in.txt fortran input file -- is this necessary?
-    dir_in = os.path.join(pystark.paths.rosato_path).encode('utf-8')
-    LS_DATA_read_f2py.in_param(len(dir_in), dir_in, n_upper, dens, temp, bfield, viewangle, wmax, npts)
+    # dir_in = os.path.join(rosato_path).encode('UTF-8')
+    # dir_in = str(os.path.join(rosato_path))
+    # dir_in = 'hello world'.encode('utf-8')
+    # dir_in = 'hello world from python'
+    # # print(len(dir_in), dir_in)
+
 
     # get the parameter grid bound indices
     iN, iT, iB = LS_DATA_read_f2py.set_bounds(dens, temp, bfield)
@@ -150,7 +154,7 @@ def rosato_stark_zeeman_profile(n_upper, dens, temp, bfield, viewangle, wmax, np
         # replace the original 'dir' outputted from LS_DATA_read with one that is defined using the full path
         # -- this step could cause headaches later on, but allows fn to be called from anywhere.
 
-        dir = os.path.join(pystark.paths.rosato_database_path, balmer_line_names[n_upper] + '/').encode('utf-8')
+        dir = os.path.join(rosato_database_path, balmer_line_names[n_upper] + '/').encode('utf-8')
 
         w_arr, ls_arr = LS_DATA_read_f2py.read_file(len(dir), dir, name)
         ls[:, i] = LS_DATA_read_f2py.ls_interpol(n_upper, dens, temp, bfield, wmax, npts, w_arr, ls_arr, iN, iT, iB)

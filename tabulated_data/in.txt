@@ -1,10 +1,10 @@
 -----------------------------------------------------
-Initial principal quantum number         :        5
-Density (cm-3)                           :   1.00E+13
-Temperature (eV)                         :   1.00E+01
+Initial principal quantum number         :        6
+Density (cm-3)                           :   5.00E+13
+Temperature (eV)                         :   5.00E+00
 Magnetic field (T)                       :   0.00E+00
 Angle (degrees)                          :   0.00E+00
 -----------------------------------------------------
-Delta_omega max (eV)                     :   2.65E-03
+Delta_omega max (eV)                     :   1.95E-02
 Number of points                         :     1001
 -----------------------------------------------------

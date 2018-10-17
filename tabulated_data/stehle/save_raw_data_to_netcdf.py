@@ -5,7 +5,7 @@ Created on Sat Feb 03 17:18:06 2018
 @author: jrh
 Edited by jsallcock 11/06/18
 
-Save the raw tabulated data for Stehle's Stark-broadened lineshape calculations as a netCDF file for easy python access.
+Save the raw tabulated tabulated_data for Stehle's Stark-broadened lineshape calculations as a netCDF file for easy python access.
 """
 
 import pystark
