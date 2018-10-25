@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 
 
 def demo():
-    """ Demo script compares all lineshape models for selected Balmer line. """
+    """ Demo script compares all available lineshape models for selected Balmer line. """
 
     n_upper = 6
     n_lower = 2
     temp = 5.  # [eV]
     dens = 5e20  # [m-3]
-    bfield = 0.  # [T]
+    bfield = 1.5  # [T]
     viewangle = 0  # [deg]
 
     # generate appropriate wavelength axis
@@ -25,6 +25,7 @@ def demo():
 
     display=False
 
+    # generate plots
     fig = plt.figure(figsize=[6, 6])
     fsize=14
     ax = fig.add_subplot(111)
@@ -61,7 +62,6 @@ def demo():
     ax.set_xlim([np.min(wl_axis_nm), np.max(wl_axis_nm)])
     leg = ax.legend(fontsize=fsize)
     ax.set_xlabel('wavelength (nm)', size=fsize)
-    # plt.semilogy()
     plt.show()
 
     return
