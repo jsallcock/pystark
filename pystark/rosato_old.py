@@ -11,13 +11,14 @@ viewangle_grid = np.array([90., 0.])  # [rad.]
 
 
 def rosato_stark_zeeman_profile_old(n_upper, dens, temp, bf, viewangle, wmax, npts, display=False):
-    """ NOW OBSOLETE, REPLACED BY rosato_profile.py, WHICH USE FORTRAN WRAPPER TO ACHIEVE >100X SPEEDUP 
+    """ NOW OBSOLETE, REPLACED BY rosato_wrapper.py, WHICH USE FORTRAN WRAPPER TO ACHIEVE >100X SPEEDUP 
     
     A python port of the LS_DATA_read.f90 from the Rosato et al. supplementary material. 
 
     Oh boy, this is mostly translated line-by-line, can you tell?  
 
-    BENCHMARKED AGAINST THE FORTRAN CODE, ls and detunings values match fortran output to 1 part in ~10^6
+    BENCHMARKED AGAINST THE FORTRAN CODE, ls and detunings values match fortran output to 1 part in ~10^6. Useful to 
+    keep for comparison/ future benchmarking.
 
     :param n_upper: 
     :param dens: [cm-3]

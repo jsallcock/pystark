@@ -1,5 +1,9 @@
 import pystark
+from pystark.tools import to_precision as tp
+
 import numpy as np
+import os, sys, traceback, time
+
 from scipy.constants import c
 import matplotlib.pyplot as plt
 
@@ -7,61 +11,61 @@ import matplotlib.pyplot as plt
 def demo():
     """ Demo script compares all available lineshape models for selected Balmer line. """
 
+    # specify plasma
+    temp = 5.  # [eV]
+    dens = 2e20  # [m-3]
+    bfield = 4.9  # [T]
+    viewangle = 0 * np.pi / 180  # [rad]
+
+    # specify line
+    isotope = 'D'
     n_upper = 6
     n_lower = 2
-    temp = 5.  # [eV]
-    dens = 5e20  # [m-3]
-    bfield = 1.5  # [T]
-    viewangle = 0  # [deg]
+
+    # plot params
+    norm_type = 'area'
+    fsize = 14
 
     # generate appropriate wavelength axis
 
-    wl_0 = pystark.get_NIST_balmer_wavelength(n_upper)
-    fwhm_voigt_hz, _, _ = pystark.estimate_fwhms(n_upper, dens, temp)
+    wl_0 = pystark.get_wl_centre(n_upper)
+    fwhm_voigt_hz = pystark.estimate_fwhm(n_upper, dens, temp, bfield, isotope)
     fwhm_voigt_m = c * fwhm_voigt_hz / (c / wl_0) ** 2
 
-    wl_axis = pystark.generate_wavelength_axis(n_upper, temp, dens)
+    wl_axis = pystark.get_wavelength_axis(n_upper, dens, temp, bfield)
     wl_axis_nm = wl_axis * 1e9
-
-    display=False
 
     # generate plots
     fig = plt.figure(figsize=[6, 6])
-    fsize=14
+
     ax = fig.add_subplot(111)
-    ax.set_title('$n_e = $' + str(dens) + ' m$^{-3}$ \n $T = $' + str(temp) + ' eV \n $B = $' + str(bfield) + ' T')
+    sigf = 2
+    ax.set_title('$n_e = $' + tp(dens, sigf) + ' m$^{-3}$, $T = $' + tp(temp, sigf) + ' eV \n $B = $' + tp(bfield, sigf) +
+                 ' T , $\\theta = $' + tp(viewangle * 180 / np.pi, sigf) + ' deg')
 
-    try:
-        ls_stehle = pystark.stehle_profile(n_upper, n_lower, temp, dens, wl_axis, display=display)
-        ax.plot(wl_axis_nm, pystark.norm_a(ls_stehle, wl_axis), '-', label='Stehle')
-    except Exception as e:
-        print('--Stehle calculation failed:')
-        print(e)
+    line_models = ['rosato', 'stehle', 'stehle param', 'voigt']
+    print('--------\ntimings:\n--------')
 
-    try:
-        ls_rosato = pystark.rosato_profile(n_upper, dens, temp, bfield, viewangle, wl_axis, display=display)
-        ax.plot(wl_axis_nm, pystark.norm_a(ls_rosato, wl_axis), '-', label='Rosato')
-    except Exception as e:
-        print('--Rosato calculation failed:')
-        print(e)
+    for line_model in line_models:
+        try:
+            start_time = time.time()
+            bls = pystark.BalmerLineshape(n_upper, dens, temp, bfield, viewangle=viewangle, line_model=line_model, wl_axis=wl_axis)
+            end_time = time.time()
 
-    try:
-        ls_loman, _, _ = pystark.simple_profile(n_upper, n_lower, temp, dens, wl_axis, model='lomanowski')
-        ax.plot(wl_axis_nm, pystark.norm_a(ls_loman, wl_axis), '-', label='Lomanowski')
-    except Exception as e:
-        print('--Lomanowski calculation failed:')
-        print(e)
+            print(line_model + ': ' + tp(end_time - start_time, sigf) + ' sec')
+            ax.plot(wl_axis_nm, pystark.ls_norm(bls.ls_szd, wl_axis, norm_type=norm_type), '-', label=line_model)
+        except Exception:
+            print('--PYSTARK-- {} calculation failed:'.format(line_model))
+            traceback.print_last()
 
-    try:
-        ls_griem, _, _ = pystark.simple_profile(n_upper, n_lower, temp, dens, wl_axis, model='griem')
-        ax.plot(wl_axis_nm, pystark.norm_a(ls_griem, wl_axis), '-', label='Griem')
-    except Exception as e:
-        print('--Griem calculation failed:')
-        print(e)
 
     ax.set_xlim([np.min(wl_axis_nm), np.max(wl_axis_nm)])
+    ax.axvline(pystark.get_wl_centre(n_upper) * 1e9, ls='--', color='dimgrey', zorder=0)
     leg = ax.legend(fontsize=fsize)
     ax.set_xlabel('wavelength (nm)', size=fsize)
+    ax.set_yticklabels([])
+    ax.set_yticks([])
+    plt.semilogy()
     plt.show()
 
     return
