@@ -146,7 +146,7 @@ class BalmerLineshape(object):
                                                                     x_out=self.wl_axis, ls=ls_szd)
 
 
-    def check_params_in_range(self):
+    # def check_params_in_range(self):
 
 
 
