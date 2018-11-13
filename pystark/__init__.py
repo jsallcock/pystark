@@ -13,8 +13,6 @@ rosato_database_path = os.path.join(rosato_path, 'database')
 nc = netcdf.netcdf_file(stehle_netcdf_file_path, 'r')
 
 from . balmer_lineshape import *
-from . stehle import *
-from . make_griem_profile import *
 from . rosato_wrapper import *
 from . tools import *
 from . demo import demo

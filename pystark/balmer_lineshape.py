@@ -145,6 +145,12 @@ class BalmerLineshape(object):
         x_out, x_centre_out, self.ls_szd = pystark.convert_ls_units(self.freq_axis, self.freq_centre, mode='interp',
                                                                     x_out=self.wl_axis, ls=ls_szd)
 
+
+    def check_params_in_range(self):
+
+
+
+
     # lineshape methods
 
     def make_rosato(self):
