@@ -1,10 +1,7 @@
-import os
-import sys
-import time
+import sys, os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.constants import e, c, k, h, physical_constants
-from scipy.signal import fftconvolve as conv
 from pystark import rosato_path, rosato_database_path
 import pystark
 

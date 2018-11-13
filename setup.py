@@ -8,8 +8,8 @@ try:
     root = os.path.dirname(os.path.realpath(__file__))
     rosato_database_path = os.path.join(root, 'tabulated_data', 'rosato')
     os.chdir(rosato_database_path)
-    subprocess.run('f2py -c -m rosato_wrapper LS_DATA_read_f2py.f90', shell=True)
-    # subprocess.check_output(['f2py'])
+    subprocess.run('f2py -c -m rosato_f90_funcs LS_DATA_read_f2py.f90', shell=True)
+    subprocess.check_output(['f2py'])
 
     os.chdir(root)
     ### For some reason, it is important to change location back to the root directory, or the package is
