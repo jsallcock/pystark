@@ -8,7 +8,7 @@ try:
     root = os.path.dirname(os.path.realpath(__file__))
     rosato_database_path = os.path.join(root, 'tabulated_data', 'rosato')
     os.chdir(rosato_database_path)
-    subprocess.run('f2py -c LS_DATA_read_f2py.f90 -m LS_DATA_read_f2py', shell=True)
+    subprocess.run('f2py -c -m rosato_wrapper LS_DATA_read_f2py.f90', shell=True)
     # subprocess.check_output(['f2py'])
 
     os.chdir(root)
@@ -18,9 +18,6 @@ try:
 except Exception as e:
     print('pystark install error:')
     print(e)
-
-
-
 
 setuptools.setup(
     name='pystark',
