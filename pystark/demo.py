@@ -12,15 +12,14 @@ def demo():
     """ Demo script compares all available lineshape models for selected Balmer line. """
 
     # specify plasma
-    temp = 5.  # [eV]
-    dens = 2e20  # [m-3]
+    temp = 1  # [eV]
+    dens = 1e20  # [m-3]
     bfield = 4.9  # [T]
-    viewangle = 0 * np.pi / 180  # [rad]
+    viewangle = 90 * np.pi / 180  # [rad]
 
     # specify line
     isotope = 'D'
-    n_upper = 6
-    n_lower = 2
+    n_upper = 5
 
     # plot params
     norm_type = 'area'
@@ -65,7 +64,7 @@ def demo():
     ax.set_xlabel('wavelength (nm)', size=fsize)
     ax.set_yticklabels([])
     ax.set_yticks([])
-    plt.semilogy()
+    # plt.semilogy()
     plt.show()
 
     return
