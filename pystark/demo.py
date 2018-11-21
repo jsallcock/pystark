@@ -8,7 +8,7 @@ from scipy.constants import c
 import matplotlib.pyplot as plt
 
 
-def demo():
+def demo(wl_centre=None):
     """ Demo script compares all available lineshape models for selected Balmer line. """
 
     # specify plasma
@@ -26,12 +26,12 @@ def demo():
     fsize = 14
 
     # generate appropriate wavelength axis
-
-    wl_0 = pystark.get_wl_centre(n_upper)
+    if wl_centre is None:
+        wl_centre = pystark.get_wl_centre(n_upper)
     fwhm_voigt_hz = pystark.estimate_fwhm(n_upper, dens, temp, bfield, isotope)
-    fwhm_voigt_m = c * fwhm_voigt_hz / (c / wl_0) ** 2
+    fwhm_voigt_m = c * fwhm_voigt_hz / (c / wl_centre) ** 2
 
-    wl_axis = pystark.get_wavelength_axis(n_upper, dens, temp, bfield)
+    wl_axis = pystark.get_wl_axis(n_upper, dens, temp, bfield)
     wl_axis_nm = wl_axis * 1e9
 
     # generate plots
@@ -48,7 +48,7 @@ def demo():
     for line_model in line_models:
         try:
             start_time = time.time()
-            bls = pystark.BalmerLineshape(n_upper, dens, temp, bfield, viewangle=viewangle, line_model=line_model, wl_axis=wl_axis)
+            bls = pystark.BalmerLineshape(n_upper, dens, temp, bfield, viewangle=viewangle, line_model=line_model, wl_axis=wl_axis, wl_centre=wl_centre)
             end_time = time.time()
 
             print(line_model + ': ' + tp(end_time - start_time, sigf) + ' sec')
@@ -57,9 +57,8 @@ def demo():
             print('--PYSTARK-- {} calculation failed:'.format(line_model))
             traceback.print_last()
 
-
     ax.set_xlim([np.min(wl_axis_nm), np.max(wl_axis_nm)])
-    ax.axvline(pystark.get_wl_centre(n_upper) * 1e9, ls='--', color='dimgrey', zorder=0)
+    ax.axvline(wl_centre * 1e9, ls='--', color='dimgrey', zorder=0)
     leg = ax.legend(fontsize=fsize)
     ax.set_xlabel('wavelength (nm)', size=fsize)
     ax.set_yticklabels([])
