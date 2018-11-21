@@ -1,5 +1,6 @@
-.idea/
+*.idea/
 *.pyc
+*.so
 build/
 .DS_Store
 __pycache__/

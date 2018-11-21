@@ -23,8 +23,8 @@ line_models = [
 ]
 
 n_upper_range = [None, (3, 7), (3, 30), (3, 9)]
-dens_range = [None, (1e19, 1e21), (1e16, 1e25), (1e19, 1e21)]
-temp_range = [None, (0.32, 32), (0.22, 110), (1, 10)]
+dens_range = [None, (1e19, 1e21), (1e16, 1e25), (0., 1e22)]
+temp_range = [None, (0.32, 32), (0.22, 110), (0., 1000)]
 bfield_range = [None, (0, 5), (0, 5), (0, 5)]
 
 param_ranges = list(zip(line_models, n_upper_range, dens_range, temp_range, bfield_range))
@@ -87,9 +87,12 @@ class BalmerLineshape(object):
             self.wl_centre = wl_centre
 
         # frequency axis for internal use only
-        self.freq_axis = pystark.get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=30, npts=self.npts)
+        self.freq_axis = pystark.get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=10, npts=self.npts)
+        # print(np.min(self.freq_axis), np.max(self.freq_axis))
+        # print('BLSBLSBLS')
         self.freq_axis_conv = pystark.get_freq_axis_conv(self.freq_axis)
         self.freq_centre = c / self.wl_centre
+        # print(self.freq_centre)
         self.energy_centre = h * self.freq_centre  # [ eV ]
 
         self.line_model = line_model

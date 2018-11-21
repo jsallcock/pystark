@@ -268,9 +268,6 @@ def to_precision(x, p):
     return "".join(out)
 
 
-
-
-
 def doppler_lineshape(x, x_centre, temp, mass, x_units='m'):
     """ generate Doppler lineshape, area-normalised to 1. 
     
@@ -315,6 +312,7 @@ def convert_ls_units(x, x_centre, mode='uniform', x_out=None, ls=None):
     # preliminary checks
     valid_modes = ['direct', 'uniform', 'interp']
     assert mode in valid_modes
+    # print(np.min(x), x_centre, np.max(x))
     assert np.min(x) < x_centre < np.max(x)
 
     # if an output axis is supplied, activate interp mode automatically
