@@ -25,6 +25,7 @@ line_models = [
 n_upper_range = [None, (3, 7), (3, 30), (3, 9)]
 dens_range = [None, (1e19, 1e21), (1e16, 1e25), (0., 1e22)]
 temp_range = [None, (0.32, 32), (0.22, 110), (0., 1000)]
+
 bfield_range = [None, (0, 5), (0, 5), (0, 5)]
 
 param_ranges = list(zip(line_models, n_upper_range, dens_range, temp_range, bfield_range))
@@ -44,9 +45,10 @@ class BalmerLineshape(object):
         :param temp: temperature [eV]
         :param bfield: magnetic field strength [T]
         :param viewangle: [rad]
+        :param line_model: can be 'voigt', 'rosato', 'stehle', 'stehle param'
         :param wl_axis: [m] 
         :param wl_centre: [m]
-        :param isotope: 
+        :param isotope: can be 'H', 'D', 'T'
         """
 
         # ensure a valid model is selected and that the input parameters lie within allowed range
@@ -61,17 +63,17 @@ class BalmerLineshape(object):
 
         self.npts = 3001
 
-        if n_upper_range is not None:
-            assert (n_upper in range(n_upper_range[0], n_upper_range[1]))
-
-        if dens_range is not None:
-            assert (dens_range[0] <= dens <= dens_range[1])
-
-        if temp_range is not None:
-            assert (temp_range[0] <= temp <= temp_range[1])
-
-        if bfield_range is not None:
-            assert (bfield_range[0] <= bfield <= bfield_range[1])
+        # if n_upper_range is not None:
+        #     assert (n_upper in range(n_upper_range[0], n_upper_range[1]))
+        #
+        # if dens_range is not None:
+        #     assert (dens_range[0] <= dens <= dens_range[1])
+        #
+        # if temp_range is not None:
+        #     assert (temp_range[0] <= temp <= temp_range[1])
+        #
+        # if bfield_range is not None:
+        #     assert (bfield_range[0] <= bfield <= bfield_range[1])
 
         # if no wavelength axis is supplied, generate reasonable values
         if wl_axis is None:
@@ -134,8 +136,14 @@ class BalmerLineshape(object):
                 ls_sd /= np.trapz(ls_sd, self.freq_axis)
 
             elif self.line_model == 'stehle':
-                ls_sd = self.make_stehle()
+                ls_s = self.make_stehle()
 
+                # Calculate Doppler lineshape
+                ls_d = pystark.doppler_lineshape(self.freq_axis_conv, self.freq_centre, self.temp, self.mass,
+                                                 x_units='Hz')
+
+                # convolution in frequency space
+                ls_sd = scipy.signal.fftconvolve(ls_s, ls_d, 'same')  # [ / Hz ]
                 ls_sd /= np.trapz(ls_sd, self.freq_axis)
 
             # account for Zeeman splitting
@@ -482,7 +490,9 @@ class BalmerLineshape(object):
         wprof_nu2 = np.concatenate((wprof_nu[::-1], wprof_nu))
         wprofs_nu2 = np.concatenate((wprofs_nu[::-1], wprofs_nu))
 
-        ls_sd = wprof_nu2
+        # for some reason, i only get a good agreement with the other models if i take the pure Stark broadened Stehle
+        # output and manually convolve it with the Doppler profile -- not sure why...
+        ls_sd = wprofs_nu2
 
         # interpolate onto frequency axis
         ls_sd = np.interp(self.freq_axis, delta_nu2 + self.freq_centre, ls_sd)

@@ -4,20 +4,22 @@ import os.path
 
 
 # try using f2py to create the python wrapper for Rosato's fortran routine.
-try:
-    root = os.path.dirname(os.path.realpath(__file__))
-    rosato_database_path = os.path.join(root, 'tabulated_data', 'rosato')
-    os.chdir(rosato_database_path)
-    subprocess.run('f2py3.5 -c -m rosato_f90_funcs LS_DATA_read_f2py.f90', shell=True)
-    subprocess.check_output(['f2py'])
+root = os.path.dirname(os.path.realpath(__file__))
+rosato_database_path = os.path.join(root, 'tabulated_data', 'rosato')
+os.chdir(rosato_database_path)
+f2pys = ['f2py3.5', 'f2py3.6', 'f2py']
+for f2py in f2pys:
+    try:
+        subprocess.run(f2py + ' -c -m rosato_f90_funcs LS_DATA_read_f2py.f90', shell=True)
+        subprocess.check_output(['f2py'])
+        break
+    except Exception as e:
+        print('pystark install error:')
+        print(e)
 
-    os.chdir(root)
-    ### For some reason, it is important to change location back to the root directory, or the package is
-    # looked for in the wrong place when importing.
-
-except Exception as e:
-    print('pystark install error:')
-    print(e)
+os.chdir(root)
+### it is important to change location back to the root directory, or the package is
+# looked for in the wrong place when importing.
 
 setuptools.setup(
     name='pystark',
