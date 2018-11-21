@@ -497,69 +497,26 @@ class BalmerLineshape(object):
 
     def make_stehle_param(self):
 
-        doppler_lineshape_hz = pystark.doppler_lineshape(self.freq_axis, self.freq_centre, self.temp, self.mass)  # TODO INTEGRATE
-
         # Paramaterised MMM Stark profile coefficients from Bart's paper
-        loman_abc_ij_idx = {'32': 0,
-                            '42': 1,
-                            '52': 2,
-                            '62': 3,
-                            '72': 4,
-                            '82': 5,
-                            '92': 6,
-                            '43': 7,
-                            '53': 8,
-                            '63': 9,
-                            '73': 10,
-                            '83': 11,
-                            '93': 12}
 
-        loman_c_ij = [3.710e-18,
-                      8.425e-18,
-                      1.310e-15,
-                      3.954e-16,
-                      6.258e-16,
-                      7.378e-16,
-                      8.947e-16,
-                      1.330e-16,
-                      6.640e-16,
-                      2.481e-15,
-                      3.270e-15,
-                      4.343e-15,
-                      5.588e-15]
+        loman_ij_abc = {
+            '32':  [0.7665, 0.064, 3.710e-18],
+            '42':  [0.7803, 0.050, 8.425e-18],
+            '52':  [0.6796, 0.030, 1.310e-15],
+            '62':  [0.7149, 0.028, 3.954e-16],
+            '72':  [0.7120, 0.029, 6.258e-16],
+            '82':  [0.7159, 0.032, 7.378e-16],
+            '92':  [0.7177, 0.033, 8.947e-16],
+            '43':  [0.7449, 0.045, 1.330e-16],
+            '53':  [0.7356, 0.044, 6.640e-16],
+            '63':  [0.7118, 0.016, 2.481e-15],
+            '73':  [0.7137, 0.029, 3.270e-15],
+            '83':  [0.7133, 0.032, 4.343e-15],
+            '93':  [0.7165, 0.033, 5.588e-15],
+        }
 
-        loman_a_ij = [0.7665,
-                      0.7803,
-                      0.6796,
-                      0.7149,
-                      0.7120,
-                      0.7159,
-                      0.7177,
-                      0.7449,
-                      0.7356,
-                      0.7118,
-                      0.7137,
-                      0.7133,
-                      0.7165]
-
-        loman_b_ij = [0.064,
-                      0.050,
-                      0.030,
-                      0.028,
-                      0.029,
-                      0.032,
-                      0.033,
-                      0.045,
-                      0.044,
-                      0.016,
-                      0.029,
-                      0.032,
-                      0.033]
-
-        ij_idx = loman_abc_ij_idx[str(self.n_upper) + str(self.n_lower)]
-        c_ij = loman_c_ij[ij_idx]
-        a_ij = loman_a_ij[ij_idx]
-        b_ij = loman_b_ij[ij_idx]
+        loman_abc = loman_ij_abc[str(self.n_upper) + str(self.n_lower)]
+        a_ij, b_ij, c_ij = loman_abc
 
         delta_lambda_12ij = c_ij * (self.dens ** a_ij) / (self.temp ** b_ij)  # nm
 
