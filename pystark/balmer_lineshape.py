@@ -23,8 +23,9 @@ line_models = [
 ]
 
 n_upper_range = [None, (3, 7), (3, 30), (3, 9)]
-dens_range = [None, (1e19, 1e21), (1e16, 1e25), (1e19, 1e21)]
-temp_range = [None, (0.32, 32), (0.22, 110), (0.3, 10)]
+dens_range = [None, (1e19, 1e21), (1e16, 1e25), (0., 1e22)]
+temp_range = [None, (0.32, 32), (0.22, 110), (0., 1000)]
+
 bfield_range = [None, (0, 5), (0, 5), (0, 5)]
 
 param_ranges = list(zip(line_models, n_upper_range, dens_range, temp_range, bfield_range))
@@ -34,7 +35,7 @@ param_ranges = pd.DataFrame(data=param_ranges, columns=columns)
 
 class BalmerLineshape(object):
     def __init__(self, n_upper, dens, temp, bfield, viewangle=0., line_model='rosato', wl_axis=None, wl_centre=None,
-                 isotope='D'):
+                 isotope='D', override_input_check=False):
         """ Hydrogen Balmer series spectral lineshape. Area normalised to 1.
         
         All I/O is in wavelength space, while internal calculations are done in frequency space where possible / appropriate.
@@ -50,35 +51,16 @@ class BalmerLineshape(object):
         :param isotope: can be 'H', 'D', 'T'
         """
 
-        # ensure a valid model is selected and that the input parameters lie within allowed range
-
-        assert isotope in isotopes
-        assert sum(param_ranges['line model names'].isin([line_model]))
-
-        n_upper_range = param_ranges['n upper range'][param_ranges['line model names'] == line_model].values[0]
-        dens_range = param_ranges['dens range'][param_ranges['line model names'] == line_model].values[0]
-        temp_range = param_ranges['temp range'][param_ranges['line model names'] == line_model].values[0]
-        bfield_range = param_ranges['bfield range'][param_ranges['line model names'] == line_model].values[0]
-
         self.npts = 3001
-
-        # if n_upper_range is not None:
-        #     assert (n_upper in range(n_upper_range[0], n_upper_range[1]))
-        #
-        # if dens_range is not None:
-        #     assert (dens_range[0] <= dens <= dens_range[1])
-        #
-        # if temp_range is not None:
-        #     assert (temp_range[0] <= temp <= temp_range[1])
-        #
-        # if bfield_range is not None:
-        #     assert (bfield_range[0] <= bfield <= bfield_range[1])
-
-        # if no wavelength axis is supplied, generate reasonable values
-        if wl_axis is None:
-            self.wl_axis = pystark.get_wavelength_axis(n_upper, dens, temp, bfield, npts=self.npts)
-        else:
-            self.wl_axis = wl_axis
+        self.line_model = line_model
+        self.n_upper = n_upper
+        self.n_lower = 2  # hard-coded: only Balmer series supported
+        self.dens = dens
+        self.temp = temp
+        self.bfield = bfield
+        self.viewangle = viewangle
+        self.isotope = isotope
+        self.mass = isotope_mass[isotopes.index(isotope)]
 
         # if no wavelength centre is supplied, retrieve
         if wl_centre is None:
@@ -87,22 +69,25 @@ class BalmerLineshape(object):
         else:
             self.wl_centre = wl_centre
 
+        # if no wavelength axis is supplied, generate reasonable values
+        if wl_axis is None:
+            self.wl_axis = pystark.get_wl_axis(n_upper, dens, temp, bfield, npts=self.npts, wl_centre=wl_centre)
+        else:
+            self.wl_axis = wl_axis
+
+        if override_input_check:
+            pass
+        else:
+            self.check_inputs_in_range()
+
         # frequency axis for internal use only
-        self.freq_axis = pystark.get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=30, npts=self.npts)
+        self.freq_axis = pystark.get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=10, npts=self.npts)
+        # print(np.min(self.freq_axis), np.max(self.freq_axis))
+
         self.freq_axis_conv = pystark.get_freq_axis_conv(self.freq_axis)
         self.freq_centre = c / self.wl_centre
+        # print(self.freq_centre)
         self.energy_centre = h * self.freq_centre  # [ eV ]
-
-        self.line_model = line_model
-        self.n_upper = n_upper
-        self.n_lower = 2  # hard-coded: only Balmer series supported
-        self.dens = dens
-        self.temp = temp
-        self.bfield = bfield
-        self.viewangle = viewangle
-
-        self.isotope = isotope
-        self.mass = isotope_mass[isotopes.index(isotope)]
 
         # generate lineshape
 
@@ -115,7 +100,6 @@ class BalmerLineshape(object):
             # convolution in frequency space
             ls_szd = scipy.signal.fftconvolve(ls_sz, ls_d, 'same')  # [ / Hz ]
             ls_szd /= np.trapz(ls_szd, self.freq_axis)
-
         else:
 
             if self.line_model == 'voigt':
@@ -135,8 +119,7 @@ class BalmerLineshape(object):
                 ls_s = self.make_stehle()
 
                 # Calculate Doppler lineshape
-                ls_d = pystark.doppler_lineshape(self.freq_axis_conv, self.freq_centre, self.temp, self.mass,
-                                                 x_units='Hz')
+                ls_d = pystark.doppler_lineshape(self.freq_axis_conv, self.freq_centre, self.temp, self.mass, x_units='Hz')
 
                 # convolution in frequency space
                 ls_sd = scipy.signal.fftconvolve(ls_s, ls_d, 'same')  # [ / Hz ]
@@ -152,13 +135,27 @@ class BalmerLineshape(object):
         x_out, x_centre_out, self.ls_szd = pystark.convert_ls_units(self.freq_axis, self.freq_centre, mode='interp',
                                                                     x_out=self.wl_axis, ls=ls_szd)
 
+    def check_inputs_in_range(self):
+        """ Ensure that the input arguments are valid / are within the valid ranges. """
 
-    # def check_params_in_range(self):
+        assert self.isotope in isotopes
+        assert sum(param_ranges['line model names'].isin([self.line_model]))
 
+        n_upper_range = param_ranges['n upper range'][param_ranges['line model names'] == self.line_model].values[0]
+        dens_range = param_ranges['dens range'][param_ranges['line model names'] == self.line_model].values[0]
+        temp_range = param_ranges['temp range'][param_ranges['line model names'] == self.line_model].values[0]
+        bfield_range = param_ranges['bfield range'][param_ranges['line model names'] == self.line_model].values[0]
 
+        if n_upper_range is not None:
+            assert (self.n_upper in range(n_upper_range[0], n_upper_range[1]))
+        if dens_range is not None:
+            assert (dens_range[0] <= self.dens <= dens_range[1])
+        if temp_range is not None:
+            assert (temp_range[0] <= self.temp <= temp_range[1])
+        if bfield_range is not None:
+            assert (bfield_range[0] <= self.bfield <= bfield_range[1])
 
-
-    # lineshape methods
+    # make lineshape methods
 
     def make_rosato(self):
         """ Stark-Zeeman lineshape interpolated using the Rosato et al. tabulated_data.
@@ -167,13 +164,7 @@ class BalmerLineshape(object):
         outputs on a uniform frequency grid.
         """
 
-        # detunings_nonuniform = c * h / (e * self.wavelengths)  # energy level detuning [ eV ]
-        # wmax = np.max(abs(detunings_nonuniform - self.energy_centre))  # [ev] max. detuning required in the interpolation
-        # # to completely cover the input wavelength axis
-        # npts = 5001  # must be odd, TODO look into why this value is used
-
-        # here, use fwhm estimate to generate inputs to interpolation routine
-
+        # use fwhm estimate to generate inputs to interpolation routine
         fwhm_estimate = pystark.estimate_fwhm(self.n_upper, self.dens, self.temp, self.bfield, isotope=self.isotope)
         no_fwhm = 20
         wmax = no_fwhm * fwhm_estimate * h / e  # [ eV ]
@@ -268,12 +259,12 @@ class BalmerLineshape(object):
         # rydberg_m = Rydberg / (1. + (electron_mass / physical_constants['deuteron mass'][0]))
         # wl_0_angst = 1e10 * (rydberg_m * (1 / n_lower ** 2 - 1 / n_upper ** 2)) ** -1
 
-        wl_0_angst = pystark.tools.get_wl_centre(self.n_upper) * 1e10
+        wl_centre_angst = self.wl_centre * 1e10
 
         c_angst = c * 1e10  # velocity of light in Ansgtroms / s
-        angular_freq_0 = 2 * np.pi * c_angst / wl_0_angst  # rad / s
+        angular_freq_0 = 2 * np.pi * c_angst / wl_centre_angst  # rad / s
 
-        otrans = -2 * np.pi * c_angst / wl_0_angst ** 2
+        otrans = -2 * np.pi * c_angst / wl_centre_angst ** 2
 
         olines = o1lines / np.abs(otrans)
         oline = o1line / np.abs(otrans)
@@ -475,13 +466,13 @@ class BalmerLineshape(object):
             wprofs = uprofs[id1, i] + (dens_cm - dense1) * (uprofs[id2, i] - uprofs[id1, i]) / (dense2 - dense1)
             delta_omega = domm[i] * normal_holtsmark_field
             delta_nu[i] = delta_omega / (2 * np.pi)
-            delta_lambda[i] = wl_0_angst * delta_omega / (angular_freq_0 + delta_omega)
+            delta_lambda[i] = wl_centre_angst * delta_omega / (angular_freq_0 + delta_omega)
             # print(delta_lambda[i])
             wprof_nu[i] = (wprof / normal_holtsmark_field) * (2. * np.pi)
             wprofs_nu[i] = (wprofs / normal_holtsmark_field) * (2. * np.pi)
             #        print '%e %e %e %e' %(delta_lambda[i],delta_nu[i],wprof_nu[i],wprofs_nu[i])
 
-        delta_lambda2 = np.concatenate((-delta_lambda[::-1], delta_lambda)) + wl_0_angst  # + olam0
+        delta_lambda2 = np.concatenate((-delta_lambda[::-1], delta_lambda)) + wl_centre_angst  # + olam0
         delta_nu2 = np.concatenate((-delta_nu[::-1], delta_nu))
         wprof_nu2 = np.concatenate((wprof_nu[::-1], wprof_nu))
         wprofs_nu2 = np.concatenate((wprofs_nu[::-1], wprofs_nu))

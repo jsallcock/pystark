@@ -11,25 +11,46 @@ def find_nearest_idx(array, value):
     return (np.abs(array - value)).argmin()
 
 
-def get_wavelength_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=1001):
+def get_wl_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=1001, wl_centre=None):
     """ For a given Balmer transition and plasma parameters, return a regular wavelength axis with sensible bounds using
      a voigt approximation for the line's FWHM.
     
     :param n_upper: 
-    :param temp: eV
-    :param dens: m^-3
-    :param npts: length of wavelength axis output.
+    :param dens:
+    :param temp:
+    :param bfield:
+    :param no_fwhm:
+    :param npts:
+    :param wl_centre:
     :return: 
     """
 
-    wavelength_centre = get_wl_centre(n_upper)
+    if wl_centre is None:
+        wl_centre = get_wl_centre(n_upper)
+
     fwhm_voigt_hz = estimate_fwhm(n_upper, dens, temp, bfield)
-    fwhm_voigt_m = c * fwhm_voigt_hz / (c / wavelength_centre) ** 2
+    fwhm_voigt_m = c * fwhm_voigt_hz / (c / wl_centre) ** 2
 
-    return np.linspace(wavelength_centre - no_fwhm * fwhm_voigt_m, wavelength_centre + no_fwhm * fwhm_voigt_m, npts)
+    return np.linspace(wl_centre - no_fwhm * fwhm_voigt_m, wl_centre + no_fwhm * fwhm_voigt_m, npts)
 
-def get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=3001):
-    freq_centre = c / get_wl_centre(n_upper)
+
+def get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=3001, wl_centre=None):
+    """
+
+    :param n_upper:
+    :param dens:
+    :param temp:
+    :param bfield:
+    :param no_fwhm:
+    :param npts:
+    :param wl_centre:
+    :return:
+    """
+
+    if wl_centre is None:
+        wl_centre = get_wl_centre(n_upper)
+
+    freq_centre = c / wl_centre
     fwhm_voigt_hz = estimate_fwhm(n_upper, dens, temp, bfield)
 
     return np.linspace(freq_centre - no_fwhm * fwhm_voigt_hz, freq_centre + no_fwhm * fwhm_voigt_hz, npts)
@@ -268,9 +289,6 @@ def to_precision(x, p):
     return "".join(out)
 
 
-
-
-
 def doppler_lineshape(x, x_centre, temp, mass, x_units='m'):
     """ generate Doppler lineshape, area-normalised to 1. 
     
@@ -315,6 +333,7 @@ def convert_ls_units(x, x_centre, mode='uniform', x_out=None, ls=None):
     # preliminary checks
     valid_modes = ['direct', 'uniform', 'interp']
     assert mode in valid_modes
+    # print(np.min(x), x_centre, np.max(x))
     assert np.min(x) < x_centre < np.max(x)
 
     # if an output axis is supplied, activate interp mode automatically
