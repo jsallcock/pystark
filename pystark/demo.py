@@ -12,9 +12,9 @@ def demo():
     """ Demo script compares all available lineshape models for selected Balmer line. """
 
     # specify plasma
-    temp = 1  # [eV]
+    temp = 2  # [eV]
     dens = 1e20  # [m-3]
-    bfield = 4.9  # [T]
+    bfield = 0.  # [T]
     viewangle = 90 * np.pi / 180  # [rad]
 
     # specify line

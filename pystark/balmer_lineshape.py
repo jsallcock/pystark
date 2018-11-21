@@ -62,17 +62,17 @@ class BalmerLineshape(object):
 
         self.npts = 3001
 
-        if n_upper_range is not None:
-            assert (n_upper in range(n_upper_range[0], n_upper_range[1]))
-
-        if dens_range is not None:
-            assert (dens_range[0] <= dens <= dens_range[1])
-
-        if temp_range is not None:
-            assert (temp_range[0] <= temp <= temp_range[1])
-
-        if bfield_range is not None:
-            assert (bfield_range[0] <= bfield <= bfield_range[1])
+        # if n_upper_range is not None:
+        #     assert (n_upper in range(n_upper_range[0], n_upper_range[1]))
+        #
+        # if dens_range is not None:
+        #     assert (dens_range[0] <= dens <= dens_range[1])
+        #
+        # if temp_range is not None:
+        #     assert (temp_range[0] <= temp <= temp_range[1])
+        #
+        # if bfield_range is not None:
+        #     assert (bfield_range[0] <= bfield <= bfield_range[1])
 
         # if no wavelength axis is supplied, generate reasonable values
         if wl_axis is None:
