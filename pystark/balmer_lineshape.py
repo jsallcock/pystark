@@ -520,10 +520,7 @@ class BalmerLineshape(object):
 
         return ls_s
 
-
-
     # general methods
-
 
     def zeeman_split(self, x, x_centre, ls, x_units='Hz'):
         """ returns input lineshape, with Zeeman splitting accounted for by a simple model"""
