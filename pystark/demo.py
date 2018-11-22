@@ -63,7 +63,7 @@ def demo(wl_centre=None):
     ax.set_xlabel('wavelength (nm)', size=fsize)
     ax.set_yticklabels([])
     ax.set_yticks([])
-    # plt.semilogy()
+    plt.semilogy()
     plt.show()
 
     return

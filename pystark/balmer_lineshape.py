@@ -38,9 +38,10 @@ class BalmerLineshape(object):
                  isotope='D', override_input_check=False):
         """ Hydrogen Balmer series spectral lineshape. Area normalised to 1.
         
-        All I/O is in wavelength space, while internal calculations are done in frequency space where possible / appropriate.
+        Input/output is in wavelength space, while internal calculations are done in frequency space where possible /
+        appropriate.
         
-        :param n_upper: upper principal quantum number
+        :param n_upper: upper principal quantum number of transition.
         :param dens: density [m^-3]
         :param temp: temperature [eV]
         :param bfield: magnetic field strength [T]
@@ -69,24 +70,24 @@ class BalmerLineshape(object):
         else:
             self.wl_centre = wl_centre
 
-        # if no wavelength axis is supplied, generate reasonable values
+        # if no wavelength axis is supplied, generate something reasonable
         if wl_axis is None:
             self.wl_axis = pystark.get_wl_axis(n_upper, dens, temp, bfield, npts=self.npts, wl_centre=wl_centre)
         else:
             self.wl_axis = wl_axis
 
+        # option to override input parameter checks - use with care
         if override_input_check:
             pass
         else:
             self.check_inputs_in_range()
 
         # frequency axis for internal use only
-        self.freq_axis = pystark.get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=10, npts=self.npts)
-        # print(np.min(self.freq_axis), np.max(self.freq_axis))
+        self.freq_axis = pystark.get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=20, npts=self.npts,
+                                               wl_centre=wl_centre)
 
         self.freq_axis_conv = pystark.get_freq_axis_conv(self.freq_axis)
         self.freq_centre = c / self.wl_centre
-        # print(self.freq_centre)
         self.energy_centre = h * self.freq_centre  # [ eV ]
 
         # generate lineshape
@@ -103,7 +104,7 @@ class BalmerLineshape(object):
         else:
 
             if self.line_model == 'voigt':
-                ls_sd = self.make_voigt()
+                ls_szd = self.make_voigt()
 
             elif self.line_model == 'stehle param':
                 ls_s = self.make_stehle_param()
@@ -115,6 +116,8 @@ class BalmerLineshape(object):
                 ls_sd = scipy.signal.fftconvolve(ls_s, ls_d, 'same')  # [ / Hz ]
                 ls_sd /= np.trapz(ls_sd, self.freq_axis)
 
+                ls_szd = self.zeeman_split(self.freq_axis, self.freq_centre, ls_sd)
+
             elif self.line_model == 'stehle':
                 ls_s = self.make_stehle()
 
@@ -125,11 +128,7 @@ class BalmerLineshape(object):
                 ls_sd = scipy.signal.fftconvolve(ls_s, ls_d, 'same')  # [ / Hz ]
                 ls_sd /= np.trapz(ls_sd, self.freq_axis)
 
-            # account for Zeeman splitting
-            if self.bfield != 0.:
                 ls_szd = self.zeeman_split(self.freq_axis, self.freq_centre, ls_sd)
-            else:
-                ls_szd = ls_sd
 
         # interpolate onto wavelength grid
         x_out, x_centre_out, self.ls_szd = pystark.convert_ls_units(self.freq_axis, self.freq_centre, mode='interp',
@@ -186,18 +185,22 @@ class BalmerLineshape(object):
 
     def make_voigt(self):
         """ takes advantage of the voigt profile being related to the real part of the Faddeeva function to avoid 
-        numerical convolution.
+        numerical convolution of Lorentzian and Gaussian profiles.
         
         :return: 
         """
 
         hwhm_doppler = pystark.doppler_fwhm(self.n_upper, self.temp, self.mass) / 2
+        sigma_doppler = hwhm_doppler / np.sqrt(2 * np.log(2))
+
         hwhm_stark = pystark.stark_fwhm(self.n_upper, self.dens) / 2
-        sigma = hwhm_doppler / np.sqrt(2 * np.log(2))
 
-        ls_sd = np.real(wofz(((self.freq_axis - self.freq_centre) + 1j * hwhm_stark) / sigma / np.sqrt(2))) / sigma / np.sqrt(2 * np.pi)
+        ls_sd = np.real(wofz(((self.freq_axis - self.freq_centre) + 1j * hwhm_stark) / sigma_doppler / np.sqrt(2))) / \
+                sigma_doppler / np.sqrt(2 * np.pi)
 
-        return ls_sd
+        ls_szd = self.zeeman_split(self.freq_axis, self.freq_centre, ls_sd)
+
+        return ls_szd
 
     def make_stehle(self):
         # ensure given n_upper + n_lower fall within tabulated values
@@ -523,15 +526,25 @@ class BalmerLineshape(object):
     # general methods
 
     def zeeman_split(self, x, x_centre, ls, x_units='Hz'):
-        """ returns input lineshape, with Zeeman splitting accounted for by a simple model"""
+        """
+         returns input lineshape, with Zeeman splitting accounted for by a simple model
+         
+        :param x: 
+        :param x_centre: 
+        :param ls: 
+        :param x_units: 
+        :return: 
+        """
 
         assert x_units in pystark.valid_x_units
+
+        if self.bfield == 0.:
+            return ls
 
         if x_units == 'm':
             freqs, freq_centre, ls = pystark.convert_ls_units(x, x_centre, ls=ls)
         else:
             freqs, freq_centre = x, x_centre
-
 
         rel_intensity_pi = np.sin(self.viewangle) ** 2 / 2
 
@@ -545,6 +558,9 @@ class BalmerLineshape(object):
         ls_pi = rel_intensity_pi * ls
 
         return ls_sigma_minus + ls_pi + ls_sigma_plus
+
+    def doppler_convolution(self):
+        pass
 
 
     def plot(self):

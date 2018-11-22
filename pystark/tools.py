@@ -56,10 +56,10 @@ def get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=3001, wl_centre=
     return np.linspace(freq_centre - no_fwhm * fwhm_voigt_hz, freq_centre + no_fwhm * fwhm_voigt_hz, npts)
 
 
-def get_freq_axis_conv(freq_axis, extra=200):
+def get_freq_axis_conv(freq_axis, extra=1000):
     """ Used in convolution. 
     
-    input freq axis must be uniform. """
+    input freq axis assumed to be uniform. """
 
     min_freq, max_freq, = np.min(freq_axis), np.max(freq_axis)
     len_axis = len(freq_axis)
