@@ -1,18 +1,11 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
 from scipy.special import wofz
 from scipy.constants import physical_constants, atomic_mass, c, h, e, k, m_e
 import scipy.signal
 
 import pystark
-
-
-# hydrogen isotope masses
-
-isotopes = ['H', 'D', 'T']
-isotope_mass = np.array([1.00794, 2.01410178, 3.01604928199]) * atomic_mass
 
 # model input parameter ranges
 line_models = [
@@ -25,7 +18,6 @@ line_models = [
 n_upper_range = [None, (3, 7), (3, 30), (3, 9)]
 dens_range = [None, (1e19, 1e21), (1e16, 1e25), (0., 1e22)]
 temp_range = [None, (0.32, 32), (0.22, 110), (0., 1000)]
-
 bfield_range = [None, (0, 5), (0, 5), (0, 5)]
 
 param_ranges = list(zip(line_models, n_upper_range, dens_range, temp_range, bfield_range))
@@ -39,7 +31,8 @@ class BalmerLineshape(object):
         """ Hydrogen Balmer series spectral lineshape. Area normalised to 1.
         
         Input/output is in wavelength space, while internal calculations are done in frequency space where possible /
-        appropriate.
+        appropriate. Only the Balmer series is currently supported, however 'stehle' and 'stehle param' models do
+        support some Paschen lines so it would be easy to incorporate those should you need to.
         
         :param n_upper: upper principal quantum number of transition.
         :param dens: density [m^-3]
@@ -50,18 +43,19 @@ class BalmerLineshape(object):
         :param wl_axis: [m] 
         :param wl_centre: [m]
         :param isotope: can be 'H', 'D', 'T'
+        :param override_input_check: skip checking that the inputs lie within valid ranges.
         """
 
         self.npts = 3001
         self.line_model = line_model
         self.n_upper = n_upper
-        self.n_lower = 2  # hard-coded: only Balmer series supported
+        self.n_lower = 2
         self.dens = dens
         self.temp = temp
         self.bfield = bfield
         self.viewangle = viewangle
         self.isotope = isotope
-        self.mass = isotope_mass[isotopes.index(isotope)]
+        self.mass = pystark.get_h_isotope_mass(isotope)
 
         # if no wavelength centre is supplied, retrieve
         if wl_centre is None:
@@ -80,10 +74,10 @@ class BalmerLineshape(object):
         if override_input_check:
             pass
         else:
-            self.check_inputs_in_range()
+            self.input_check()
 
         # frequency axis for internal use only
-        self.freq_axis = pystark.get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=20, npts=self.npts,
+        self.freq_axis = pystark.get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=30, npts=self.npts,
                                                wl_centre=wl_centre)
 
         self.freq_axis_conv = pystark.get_freq_axis_conv(self.freq_axis)
@@ -134,10 +128,11 @@ class BalmerLineshape(object):
         x_out, x_centre_out, self.ls_szd = pystark.convert_ls_units(self.freq_axis, self.freq_centre, mode='interp',
                                                                     x_out=self.wl_axis, ls=ls_szd)
 
-    def check_inputs_in_range(self):
-        """ Ensure that the input arguments are valid / are within the valid ranges. """
+        self.ls_szd = pystark.ls_norm(self.ls_szd, self.wl_axis)
 
-        assert self.isotope in isotopes
+    def input_check(self):
+        """ Check that the input arguments are valid. """
+
         assert sum(param_ranges['line model names'].isin([self.line_model]))
 
         n_upper_range = param_ranges['n upper range'][param_ranges['line model names'] == self.line_model].values[0]
@@ -561,7 +556,6 @@ class BalmerLineshape(object):
 
     def doppler_convolution(self):
         pass
-
 
     def plot(self):
 

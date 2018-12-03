@@ -1,10 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.constants import e, k, c
+from scipy.constants import e, k, c, atomic_mass
 import pystark
 import math
 
 valid_x_units = ['m', 'Hz']
+
+
+def get_h_isotope_mass(isotope):
+    """
+    :return:
+    """
+
+    isotope_masses = {'H': 1.00794 * atomic_mass,
+                      'D': 2.01410178 * atomic_mass,
+                      'T': 3.01604928199 * atomic_mass}
+
+    assert isotope in list(isotope_masses.keys())
+
+    return isotope_masses[isotope]
+
 
 def find_nearest_idx(array, value):
     array = np.asarray(array)
@@ -78,7 +93,7 @@ def estimate_fwhm(n_upper, dens, temp, bfield, isotope='D'):
     # TODO incorporate Zeeman effect scaling
 
     freq_centre = c / get_wl_centre(n_upper)
-    mass = pystark.isotope_mass[pystark.isotopes.index(isotope)]
+    mass = pystark.get_h_isotope_mass(isotope)
 
     # Doppler FWHM: Gaussian
     fwhm_gauss_hz = doppler_fwhm(n_upper, temp, mass)
