@@ -13,7 +13,12 @@ rosato_database_path = os.path.join(rosato_path, 'database')
 nc = netcdf.netcdf_file(stehle_netcdf_file_path, 'r')
 
 from . balmer_lineshape import *
-from . rosato_wrapper import *
+
+try:
+    from . rosato_wrapper import *
+except:
+    print('--pystark: Rosato model could not be imported')
+
 from . tools import *
 from . demo import demo
 
