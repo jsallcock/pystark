@@ -42,13 +42,14 @@ def demo(wl_centre=None):
     ax.set_title('$n_e = $' + tp(dens, sigf) + ' m$^{-3}$, $T = $' + tp(temp, sigf) + ' eV \n $B = $' + tp(bfield, sigf) +
                  ' T , $\\theta = $' + tp(viewangle * 180 / np.pi, sigf) + ' deg')
 
-    line_models = ['rosato', 'stehle', 'stehle param', 'voigt']
+    line_models = ['rosato', 'stehle', 'stehle_param', 'voigt']
     print('--------\ntimings:\n--------')
 
     for line_model in line_models:
         try:
             start_time = time.time()
-            bls = pystark.BalmerLineshape(n_upper, dens, temp, bfield, viewangle=viewangle, line_model=line_model, wl_axis=wl_axis, wl_centre=wl_centre)
+            bls = pystark.BalmerLineshape(n_upper, dens, temp, bfield, viewangle=viewangle, line_model=line_model,
+                                          wl_axis=wl_axis, wl_centre=wl_centre, override_input_check=True)
             end_time = time.time()
 
             print(line_model + ': ' + tp(end_time - start_time, sigf) + ' sec')
@@ -67,6 +68,7 @@ def demo(wl_centre=None):
     plt.show()
 
     return
+
 
 if __name__ == '__main__':
     demo()

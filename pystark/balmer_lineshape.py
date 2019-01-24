@@ -4,49 +4,72 @@ import matplotlib.pyplot as plt
 from scipy.special import wofz
 from scipy.constants import physical_constants, atomic_mass, c, h, e, k, m_e
 import scipy.signal
-
 import pystark
-
-# model input parameter ranges
-line_models = [
-    'voigt',
-    'rosato',
-    'stehle',
-    'stehle param',
-]
-
-n_upper_range = [None, (3, 7), (3, 30), (3, 9)]
-dens_range = [None, (1e19, 1e21), (1e16, 1e25), (0., 1e22)]
-temp_range = [None, (0.32, 32), (0.22, 110), (0., 1000)]
-bfield_range = [None, (0, 5), (0, 5), (0, 5)]
-
-param_ranges = list(zip(line_models, n_upper_range, dens_range, temp_range, bfield_range))
-columns = ['line model names', 'n upper range', 'dens range', 'temp range', 'bfield range']
-param_ranges = pd.DataFrame(data=param_ranges, columns=columns)
 
 
 class BalmerLineshape(object):
-    def __init__(self, n_upper, dens, temp, bfield, viewangle=0., line_model='rosato', wl_axis=None, wl_centre=None,
-                 isotope='D', override_input_check=False):
-        """ Hydrogen Balmer series spectral lineshape. Area normalised to 1.
+    def __init__(self, n_upper, dens, temp, bfield, viewangle=0., line_model='rosato', wl_axis=None,
+                 wl_centre=None, npts=None, isotope='D', override_input_check=False):
+
+        """ Hydrogen Balmer series spectral lineshape. Area-normalised to 1.
         
-        Input/output is in wavelength space, while internal calculations are done in frequency space where possible /
+        Input / output is in wavelength space, while internal calculations are done in frequency space where possible /
         appropriate. Only the Balmer series is currently supported, however 'stehle' and 'stehle param' models do
-        support some Paschen lines so it would be easy to incorporate those should you need to.
+        support some Paschen lines so it would be easy to incorporate those should you need to. Not optimised for
+        speed yet.
         
         :param n_upper: upper principal quantum number of transition.
-        :param dens: density [m^-3]
-        :param temp: temperature [eV]
-        :param bfield: magnetic field strength [T]
-        :param viewangle: [rad]
-        :param line_model: can be 'voigt', 'rosato', 'stehle', 'stehle param'
-        :param wl_axis: [m] 
-        :param wl_centre: [m]
+        :type n_upper: int
+
+        :param dens: density [ m^-3 ]
+        :type dens: float
+
+        :param temp: temperature [ eV ]
+        :type temp: float
+
+        :param bfield: magnetic field strength [ T ]
+        :type dens: float
+
+        :param viewangle: [ rad ]
+        :type viewangle: float
+
+        :param line_model: can be:
+
+        - 'voigt':
+
+        - 'rosato':
+
+        - 'stehle':
+
+        - 'stehle_param':
+
+        :type line_model: str
+
+        :param wl_axis: [ m ]
+        :type wl_axis: np.array
+
+        :param wl_centre: [ m ]
+        :type wl_centre: float
+
+        :param npts: number of points in auto-generated wl_axis (if wl_axis not specified)
+        :type npts: int
+
         :param isotope: can be 'H', 'D', 'T'
-        :param override_input_check: skip checking that the inputs lie within valid ranges.
+        :type isotope: str
+
+        :param override_input_check: skip checking that the inputs lie within valid ranges - use with care
+        :type override_input_check: bool
         """
 
-        self.npts = 3001
+        # if no wavelength centre supplied, retrieve NIST value
+        if wl_centre is None:
+            wl_centre = pystark.get_wl_centre(n_upper)
+
+        # if no wavelength axis supplied, generate reasonable axis
+        if wl_axis is None:
+            npts = 3001
+            wl_axis = pystark.get_wl_axis(n_upper, dens, temp, bfield, npts=self.npts, wl_centre=wl_centre)
+
         self.line_model = line_model
         self.n_upper = n_upper
         self.n_lower = 2
@@ -56,24 +79,10 @@ class BalmerLineshape(object):
         self.viewangle = viewangle
         self.isotope = isotope
         self.mass = pystark.get_h_isotope_mass(isotope)
+        self.wl_centre = wl_centre
+        self.wl_axis = wl_axis
 
-        # if no wavelength centre is supplied, retrieve
-        if wl_centre is None:
-            # NIST value for chosen Balmer line.
-            self.wl_centre = pystark.get_wl_centre(n_upper)
-        else:
-            self.wl_centre = wl_centre
-
-        # if no wavelength axis is supplied, generate something reasonable
-        if wl_axis is None:
-            self.wl_axis = pystark.get_wl_axis(n_upper, dens, temp, bfield, npts=self.npts, wl_centre=wl_centre)
-        else:
-            self.wl_axis = wl_axis
-
-        # option to override input parameter checks - use with care
-        if override_input_check:
-            pass
-        else:
+        if override_input_check is False:
             self.input_check()
 
         # frequency axis for internal use only
@@ -81,11 +90,10 @@ class BalmerLineshape(object):
                                                wl_centre=wl_centre)
 
         self.freq_axis_conv = pystark.get_freq_axis_conv(self.freq_axis)
-        self.freq_centre = c / self.wl_centre
+        self.freq_centre = c / wl_centre
         self.energy_centre = h * self.freq_centre  # [ eV ]
 
         # generate lineshape
-
         if self.line_model == 'rosato':
             ls_sz = self.make_rosato()
 
@@ -100,7 +108,7 @@ class BalmerLineshape(object):
             if self.line_model == 'voigt':
                 ls_szd = self.make_voigt()
 
-            elif self.line_model == 'stehle param':
+            elif self.line_model == 'stehle_param':
                 ls_s = self.make_stehle_param()
 
                 # Calculate Doppler lineshape
@@ -131,7 +139,22 @@ class BalmerLineshape(object):
         self.ls_szd = pystark.ls_norm(self.ls_szd, self.wl_axis)
 
     def input_check(self):
-        """ Check that the input arguments are valid. """
+        """
+        Check __init__ arguments are valid.
+
+        """
+
+        # TODO this all seems a bit convoluted...
+
+        line_models = ['voigt', 'rosato', 'stehle', 'stehle_param',]
+        n_upper_range = [None, (3, 7), (3, 30), (3, 9)]
+        dens_range = [None, (1e19, 1e21), (1e16, 1e25), (0., 1e22)]
+        temp_range = [None, (0.32, 32), (0.22, 110), (0., 1000)]
+        bfield_range = [None, (0, 5), (0, 5), (0, 5)]
+
+        param_ranges = list(zip(line_models, n_upper_range, dens_range, temp_range, bfield_range))
+        columns = ['line model names', 'n upper range', 'dens range', 'temp range', 'bfield range']
+        param_ranges = pd.DataFrame(data=param_ranges, columns=columns)
 
         assert sum(param_ranges['line model names'].isin([self.line_model]))
 
@@ -149,12 +172,15 @@ class BalmerLineshape(object):
         if bfield_range is not None:
             assert (bfield_range[0] <= self.bfield <= bfield_range[1])
 
-    # make lineshape methods
     def make_rosato(self):
-        """ Stark-Zeeman lineshape interpolated using the Rosato et al. tabulated_data.
+        """
+        Stark-Zeeman lineshape interpolated using the Rosato et al. tabulated_data.
         tables.
         
         outputs on a uniform frequency grid.
+
+        :return:
+
         """
 
         # use fwhm estimate to generate inputs to interpolation routine
@@ -178,10 +204,12 @@ class BalmerLineshape(object):
         return ls_sz
 
     def make_voigt(self):
-        """ takes advantage of the voigt profile being related to the real part of the Faddeeva function to avoid 
-        numerical convolution of Lorentzian and Gaussian profiles.
+        """
+        Voigt profile is related to the real part of the Faddeeva function -- avoids numerical convolution of
+        Lorentzian and Gaussian profiles.
         
-        :return: 
+        :return:
+
         """
 
         hwhm_doppler = pystark.doppler_fwhm(self.n_upper, self.temp, self.mass) / 2
@@ -196,8 +224,47 @@ class BalmerLineshape(object):
 
         return ls_szd
 
+    def make_stehle_param(self):
+
+        # Paramaterised MMM Stark profile coefficients from Bart's paper
+
+        loman_ij_abc = {
+            '32':  [0.7665, 0.064, 3.710e-18],
+            '42':  [0.7803, 0.050, 8.425e-18],
+            '52':  [0.6796, 0.030, 1.310e-15],
+            '62':  [0.7149, 0.028, 3.954e-16],
+            '72':  [0.7120, 0.029, 6.258e-16],
+            '82':  [0.7159, 0.032, 7.378e-16],
+            '92':  [0.7177, 0.033, 8.947e-16],
+            '43':  [0.7449, 0.045, 1.330e-16],
+            '53':  [0.7356, 0.044, 6.640e-16],
+            '63':  [0.7118, 0.016, 2.481e-15],
+            '73':  [0.7137, 0.029, 3.270e-15],
+            '83':  [0.7133, 0.032, 4.343e-15],
+            '93':  [0.7165, 0.033, 5.588e-15],
+        }
+
+        loman_abc = loman_ij_abc[str(self.n_upper) + str(self.n_lower)]
+        a_ij, b_ij, c_ij = loman_abc
+
+        delta_lambda_12ij = c_ij * (self.dens ** a_ij) / (self.temp ** b_ij)  # nm
+
+        ls_s = 1 / (abs((self.wl_axis - self.wl_centre) * 1e9) ** (5. / 2.) +
+                    (delta_lambda_12ij / 2) ** (5. / 2.))
+
+        ls_s /= np.trapz(ls_s, self.wl_axis)
+
+        x_out, x_centre_out, ls_s = pystark.convert_ls_units(self.wl_axis, self.wl_centre, mode='interp', x_out=self.freq_axis, ls=ls_s)
+
+        return ls_s
+
     def make_stehle(self):
-        # ensure given n_upper + n_lower fall within tabulated values
+        """
+        ensure given n_upper + n_lower fall within tabulated values
+
+        :return:
+
+        """
 
         temp_k = self.temp * e / k  # temperature in K
         dens_cm = self.dens * 1.e-6  # electronic density in cm-3
@@ -483,42 +550,6 @@ class BalmerLineshape(object):
 
         return ls_sd
 
-    def make_stehle_param(self):
-
-        # Paramaterised MMM Stark profile coefficients from Bart's paper
-
-        loman_ij_abc = {
-            '32':  [0.7665, 0.064, 3.710e-18],
-            '42':  [0.7803, 0.050, 8.425e-18],
-            '52':  [0.6796, 0.030, 1.310e-15],
-            '62':  [0.7149, 0.028, 3.954e-16],
-            '72':  [0.7120, 0.029, 6.258e-16],
-            '82':  [0.7159, 0.032, 7.378e-16],
-            '92':  [0.7177, 0.033, 8.947e-16],
-            '43':  [0.7449, 0.045, 1.330e-16],
-            '53':  [0.7356, 0.044, 6.640e-16],
-            '63':  [0.7118, 0.016, 2.481e-15],
-            '73':  [0.7137, 0.029, 3.270e-15],
-            '83':  [0.7133, 0.032, 4.343e-15],
-            '93':  [0.7165, 0.033, 5.588e-15],
-        }
-
-        loman_abc = loman_ij_abc[str(self.n_upper) + str(self.n_lower)]
-        a_ij, b_ij, c_ij = loman_abc
-
-        delta_lambda_12ij = c_ij * (self.dens ** a_ij) / (self.temp ** b_ij)  # nm
-
-        ls_s = 1 / (abs((self.wl_axis - self.wl_centre) * 1e9) ** (5. / 2.) +
-                    (delta_lambda_12ij / 2) ** (5. / 2.))
-
-        ls_s /= np.trapz(ls_s, self.wl_axis)
-
-        x_out, x_centre_out, ls_s = pystark.convert_ls_units(self.wl_axis, self.wl_centre, mode='interp', x_out=self.freq_axis, ls=ls_s)
-
-        return ls_s
-
-    # general methods
-
     def zeeman_split(self, x, x_centre, ls, x_units='Hz'):
         """
          returns input lineshape, with Zeeman splitting accounted for by a simple model
@@ -527,7 +558,8 @@ class BalmerLineshape(object):
         :param x_centre: 
         :param ls: 
         :param x_units: 
-        :return: 
+        :return:
+
         """
 
         assert x_units in pystark.valid_x_units

@@ -72,9 +72,10 @@ def get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=3001, wl_centre=
 
 
 def get_freq_axis_conv(freq_axis, extra=1000):
-    """ Used in convolution. 
-    
-    input freq axis assumed to be uniform. """
+    """
+    extend a uniform frequency axis for use in convolution to avoid edge effects
+
+    """
 
     min_freq, max_freq, = np.min(freq_axis), np.max(freq_axis)
     len_axis = len(freq_axis)
@@ -87,12 +88,21 @@ def get_freq_axis_conv(freq_axis, extra=1000):
 
 
 def estimate_fwhm(n_upper, dens, temp, bfield, isotope='D'):
-    """ Estimate the FWHM for Stark and Doppler broadened Balmer line -- used for generating dynamic frequency detuning
-    axes. """
+    """
+    use approx. scalings to estimate the lineshape FWHM for detuning axis generation
+
+    :param n_upper:
+    :param dens:
+    :param temp:
+    :param bfield:
+    :param isotope:
+
+    :return: [ Hz ]
+
+    """
 
     # TODO incorporate Zeeman effect scaling
 
-    freq_centre = c / get_wl_centre(n_upper)
     mass = pystark.get_h_isotope_mass(isotope)
 
     # Doppler FWHM: Gaussian
@@ -101,19 +111,22 @@ def estimate_fwhm(n_upper, dens, temp, bfield, isotope='D'):
     # Stark FWHM: Lorentzian
     fwhm_lorentz_hz = stark_fwhm(n_upper, dens)
 
-    # total FWHM: Voigt. approximation from Voigt wikipedia page.
+    # total FWHM: Voigt. approximation (https://en.wikipedia.org/wiki/Voigt_profile)
     fwhm = 0.5346 * fwhm_lorentz_hz + np.sqrt(0.2166 * fwhm_lorentz_hz ** 2 + fwhm_gauss_hz ** 2)
 
     return fwhm
 
 
 def doppler_fwhm(n_upper, temp, mass):
-    """ Return the FWHM of Doppler-broadened Balmer series line.
+    """
+    Doppler-broadened FWHM
     
     :param n_upper: 
-    :param temp: 
-    :param mass: 
+    :param temp: [ eV ]
+    :param mass:
+
     :return: fwhm [ Hz ]
+
     """
 
     freq_centre = c / get_wl_centre(n_upper)
@@ -126,23 +139,34 @@ def doppler_fwhm(n_upper, temp, mass):
 
 
 def stark_fwhm(n_upper, dens):
-    """ Griem's scaling for the full width half maximum """
+    """
+    Griem's scaling for Stark-broadened FWHM
+
+    :param n_upper:
+    :param dens: [ m^-3 ]
+
+    :return: fwhm [ Hz ]
+    """
 
     wavelength_centre = get_wl_centre(n_upper)
 
     griem_alpha_12s = {3: 0.05, 4: 0.08, 5: 0.09, 6: 0.17, 7: 0.22, 8: 0.28, 9: 0.36,
-                       10: 0.46}  # odd values are bogus, even values from Hutchinson -- this is just approximate though
+                       10: 0.46}  # values approximate
     alpha_12 = griem_alpha_12s[n_upper]
 
     ne_20 = dens * 1e-20  # convert into units: 10 ** 20 m ** -3
-    fwhm_lorentz_m = 1e-9 * 0.54 * alpha_12 * ne_20 ** (2. / 3.)  # Griem scaling
+    fwhm_lorentz_m = 1e-9 * 0.54 * alpha_12 * ne_20 ** (2 / 3)  # Griem scaling
     fwhm_lorentz_hz = fwhm_lorentz_m * c / wavelength_centre ** 2
 
     return fwhm_lorentz_hz
 
 
 def get_wl_centre(n_upper):
-    """ Source: NIST. These values are for deuterium, with unresolved fine-structure transitions/"""
+    """
+    Source: NIST. These values are for deuterium, with unresolved fine-structure transitions
+
+    """
+
     assert n_upper in [3, 4, 5, 6, 7, 8]
     return [0, 0, 0, 656.1012, 486.00013, 433.92833, 410.06186, 396.89923, 388.79902][n_upper] * 1e-9
 
@@ -164,7 +188,10 @@ def get_stehle_balmer_wavelength(n_upper):
 
 
 def get_fwhm(x, y, disp=False):
-    """ given a function with a SINGLE PEAK, find the FWHM without fitting. QUICK AND DIRTY. """
+    """
+    given a function with a SINGLE PEAK, find the FWHM without fitting. QUICK AND DIRTY.
+
+    """
 
     # normalise height
     y_norm = y / np.max(y)
@@ -177,7 +204,6 @@ def get_fwhm(x, y, disp=False):
     hm_idx_l, hm_idx_u = np.interp(0.5, y_l, x_l), np.interp(0.5, y_u[::-1], x_u[::-1])
 
     fwhm = hm_idx_u - hm_idx_l
-
 
     if disp:
 
