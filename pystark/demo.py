@@ -54,7 +54,7 @@ def demo(wl_centre=None):
 
             print(line_model + ': ' + tp(end_time - start_time, sigf) + ' sec')
             ax.plot(wl_axis_nm, pystark.ls_norm(bls.ls_szd, wl_axis, norm_type=norm_type), '-', label=line_model)
-        except Exception:
+        except:
             print('--PYSTARK-- {} calculation failed:'.format(line_model))
             traceback.print_last()
 
