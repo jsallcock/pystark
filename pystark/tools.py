@@ -26,7 +26,7 @@ def find_nearest_idx(array, value):
     return (np.abs(array - value)).argmin()
 
 
-def get_wl_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=1001, wl_centre=None):
+def get_wl_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=3001, wl_centre=None):
     """ For a given Balmer transition and plasma parameters, return a regular wavelength axis with sensible bounds using
      a voigt approximation for the line's FWHM.
     

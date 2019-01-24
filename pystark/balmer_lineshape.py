@@ -61,15 +61,18 @@ class BalmerLineshape(object):
         :type override_input_check: bool
         """
 
+        if npts is None:
+            npts = 3001
+
         # if no wavelength centre supplied, retrieve NIST value
         if wl_centre is None:
             wl_centre = pystark.get_wl_centre(n_upper)
 
         # if no wavelength axis supplied, generate reasonable axis
         if wl_axis is None:
-            npts = 3001
-            wl_axis = pystark.get_wl_axis(n_upper, dens, temp, bfield, npts=self.npts, wl_centre=wl_centre)
+            wl_axis = pystark.get_wl_axis(n_upper, dens, temp, bfield, npts=npts, wl_centre=wl_centre)
 
+        self.npts = npts
         self.line_model = line_model
         self.n_upper = n_upper
         self.n_lower = 2
