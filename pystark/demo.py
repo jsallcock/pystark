@@ -56,7 +56,7 @@ def demo(wl_centre=None):
             ax.plot(wl_axis_nm, pystark.ls_norm(bls.ls_szd, wl_axis, norm_type=norm_type), '-', label=line_model)
         except:
             print('--PYSTARK-- {} calculation failed:'.format(line_model))
-            traceback.print_last()
+            # traceback.print_last()
 
     ax.set_xlim([np.min(wl_axis_nm), np.max(wl_axis_nm)])
     ax.axvline(wl_centre * 1e9, ls='--', color='dimgrey', zorder=0)
