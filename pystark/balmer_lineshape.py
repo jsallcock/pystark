@@ -150,7 +150,6 @@ class BalmerLineshape(object):
             assert (bfield_range[0] <= self.bfield <= bfield_range[1])
 
     # make lineshape methods
-
     def make_rosato(self):
         """ Stark-Zeeman lineshape interpolated using the Rosato et al. tabulated_data.
         tables.
