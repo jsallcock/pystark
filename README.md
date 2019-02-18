@@ -24,7 +24,7 @@ able to run 'f2py3.5' from the terminal)
 In the top-level cloned pystark directory run terminal command:
 
 ```
-pip install -e --user.
+pip install -e . --user
 ```
 Then from python try:
 ```
