@@ -12,14 +12,15 @@ def demo(wl_centre=None):
     """ Demo script compares all available lineshape models for selected Balmer line. """
 
     # specify plasma
-    temp = 2  # [eV]
-    dens = 1e20  # [m-3]
+    temp = 0.4  # [eV]
+    dens = 5e21  # [m-3]
     bfield = 0.  # [T]
     viewangle = 90 * np.pi / 180  # [rad]
 
     # specify line
-    isotope = 'D'
-    n_upper = 5
+    species = 'He'
+    n_upper = 4
+    n_lower = 3
 
     # plot params
     norm_type = 'area'
@@ -27,11 +28,8 @@ def demo(wl_centre=None):
 
     # generate appropriate wavelength axis
     if wl_centre is None:
-        wl_centre = pystark.get_wl_centre(n_upper)
-    fwhm_voigt_hz = pystark.estimate_fwhm(n_upper, dens, temp, bfield, isotope)
-    fwhm_voigt_m = c * fwhm_voigt_hz / (c / wl_centre) ** 2
-
-    wl_axis = pystark.get_wl_axis(n_upper, dens, temp, bfield)
+        wl_centre = pystark.get_wl_centre(species, n_upper, n_lower)
+    wl_axis = pystark.get_wl_axis(species, n_upper, n_lower, dens, temp, bfield)
     wl_axis_nm = wl_axis * 1e9
 
     # generate plots
@@ -48,8 +46,8 @@ def demo(wl_centre=None):
     for line_model in line_models:
         try:
             start_time = time.time()
-            bls = pystark.BalmerLineshape(n_upper, dens, temp, bfield, viewangle=viewangle, line_model=line_model,
-                                          wl_axis=wl_axis, wl_centre=wl_centre, override_input_check=True)
+            bls = pystark.StarkLineshape(species, n_upper, n_lower, dens, temp, bfield, viewangle=viewangle, line_model=line_model,
+                                         wl_axis=wl_axis, wl_centre=wl_centre, override_input_check=True)
             end_time = time.time()
 
             print(line_model + ': ' + tp(end_time - start_time, sigf) + ' sec')
@@ -64,8 +62,14 @@ def demo(wl_centre=None):
     ax.set_xlabel('wavelength (nm)', size=fsize)
     ax.set_yticklabels([])
     ax.set_yticks([])
-    plt.semilogy()
+    # plt.semilogy()
     plt.show()
+
+    return
+
+
+def demo_helium():
+    pass
 
     return
 

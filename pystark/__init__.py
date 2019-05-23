@@ -12,7 +12,7 @@ rosato_database_path = os.path.join(rosato_path, 'database')
 # load tabulated_data from 'stehle_tables.nc'
 nc = netcdf.netcdf_file(stehle_netcdf_file_path, 'r')
 
-from . balmer_lineshape import *
+from . stark_lineshape import *
 
 try:
     from . rosato_wrapper import *

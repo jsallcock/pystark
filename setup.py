@@ -7,7 +7,8 @@ import os.path
 root = os.path.dirname(os.path.realpath(__file__))
 rosato_database_path = os.path.join(root, 'tabulated_data', 'rosato')
 os.chdir(rosato_database_path)
-f2pys = ['f2py3.5', 'f2py3.6', 'f2py']
+# f2pys = ['f2py3.5', 'f2py3.6', 'f2py']
+f2pys = ['f2py3.6']
 for f2py in f2pys:
     try:
         subprocess.run(f2py + ' -c -m rosato_f90_funcs LS_DATA_read_f2py.f90', shell=True)

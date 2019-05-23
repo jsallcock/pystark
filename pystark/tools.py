@@ -1,34 +1,62 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.constants import e, k, c, atomic_mass
+from scipy.constants import e, k, c, atomic_mass, m_e
 import pystark
 import math
 
 valid_x_units = ['m', 'Hz']
 
 
-def get_h_isotope_mass(isotope):
+def get_wl_centre(species, n_upper, n_lower):
     """
-    :return:
+    Central wavelength of spectral line ( m ). Source: NIST.
+
+    Not fine-structure resolved (ie. weighted mean of fine structure components)
+
+    :param species: string, 'H' etc.
+    :param n_upper: int, upper principal quantum number
+    :param n_lower: int, lower principal quantum number
+    :return: float, wl_centre ( m )
+
     """
 
-    isotope_masses = {'H': 1.00794 * atomic_mass,
-                      'D': 2.01410178 * atomic_mass,
-                      'T': 3.01604928199 * atomic_mass}
+    wls_nm = {'H32': 656.279,
+           'H42': 486.135,
+           'H52': 434.0472,
+           'H62': 410.1734,
 
-    assert isotope in list(isotope_masses.keys())
+           'D32': 656.106652,
+           'D42': 486.00013,
+           'D52': 433.92833,
+           'D62': 410.06186,
 
-    return isotope_masses[isotope]
+           'He43': 468.6,
+           }
+    key = species + str(n_upper) + str(n_lower)
+    assert key in list(wls_nm.keys())
+    return wls_nm[key] * 1e-9
 
 
-def find_nearest_idx(array, value):
-    array = np.asarray(array)
-    return (np.abs(array - value)).argmin()
+def get_species_mass(species):
+    """
+    mass of emitting ion species ( kg )
+
+    :param species: string, 'H', 'D', 'He' etc.
+    :return: float, mass ( kg )
+    """
+
+    mass = {'H': 1.00794 * atomic_mass,
+            'D': 2.01410178 * atomic_mass,
+            'T': 3.01604928199 * atomic_mass,
+            'He': 4.002602 * atomic_mass,
+            }
+    assert species in list(mass.keys())
+    return mass[species]
 
 
-def get_wl_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=3001, wl_centre=None):
-    """ For a given Balmer transition and plasma parameters, return a regular wavelength axis with sensible bounds using
-     a voigt approximation for the line's FWHM.
+def get_wl_axis(species, n_upper, n_lower, dens, temp, bfield, no_fwhm=15, npts=2001, wl_centre=None):
+    """
+    For a given species, transition and plasma, return sensible, regular wavelength axis ( m )
     
     :param n_upper: 
     :param dens:
@@ -41,83 +69,38 @@ def get_wl_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=3001, wl_centre=No
     """
 
     if wl_centre is None:
-        wl_centre = get_wl_centre(n_upper)
+        wl_centre = get_wl_centre(species, n_upper, n_lower)
 
-    fwhm_voigt_hz = estimate_fwhm(n_upper, dens, temp, bfield)
+    fwhm_voigt_hz = estimate_fwhm(species, n_upper, n_lower, dens, temp, bfield)
     fwhm_voigt_m = c * fwhm_voigt_hz / (c / wl_centre) ** 2
-
     return np.linspace(wl_centre - no_fwhm * fwhm_voigt_m, wl_centre + no_fwhm * fwhm_voigt_m, npts)
 
 
-def get_freq_axis(n_upper, dens, temp, bfield, no_fwhm=12, npts=3001, wl_centre=None):
+def estimate_fwhm(species, n_upper, n_lower, e_dens, temp, bfield):
     """
+    use scalings to estimate the lineshape full width half maximum (FWHM)
 
-    :param n_upper:
-    :param dens:
-    :param temp:
-    :param bfield:
-    :param no_fwhm:
-    :param npts:
-    :param wl_centre:
-    :return:
-    """
-
-    if wl_centre is None:
-        wl_centre = get_wl_centre(n_upper)
-
-    freq_centre = c / wl_centre
-    fwhm_voigt_hz = estimate_fwhm(n_upper, dens, temp, bfield)
-
-    return np.linspace(freq_centre - no_fwhm * fwhm_voigt_hz, freq_centre + no_fwhm * fwhm_voigt_hz, npts)
-
-
-def get_freq_axis_conv(freq_axis, extra=1000):
-    """
-    extend a uniform frequency axis for use in convolution to avoid edge effects
-
-    """
-
-    min_freq, max_freq, = np.min(freq_axis), np.max(freq_axis)
-    len_axis = len(freq_axis)
-    dfreq = abs(freq_axis[1] - freq_axis[0])
-    min_freq_conv = min_freq - extra / 2 * dfreq
-    max_freq_conv = max_freq + extra / 2 * dfreq
-    freq_axis_conv = np.linspace(min_freq_conv, max_freq_conv, len_axis + extra)
-
-    return freq_axis_conv
-
-
-def estimate_fwhm(n_upper, dens, temp, bfield, isotope='D'):
-    """
-    use approx. scalings to estimate the lineshape FWHM for detuning axis generation
-
-    :param n_upper:
-    :param dens:
-    :param temp:
-    :param bfield:
+    :param n_upper: upper principal quantum number
+    :param e_dens: electron density [ /m^3 ]
+    :param n_temp: neutral temperature [ eV ]
+    :param bfield: magnetic field strength [ T ]
     :param isotope:
 
-    :return: [ Hz ]
+    :return: fwhm [ Hz ]
 
     """
 
-    # TODO incorporate Zeeman effect scaling
+    fwhm_doppler = get_fwhm_doppler(species, n_upper, n_lower, temp)
+    fwhm_stark = get_fwhm_stark(species, n_upper, n_lower, e_dens)
+    zeeman_split = e / (4 * np.pi * m_e) * bfield
 
-    mass = pystark.get_h_isotope_mass(isotope)
+    # total FWHM: Voigt (approximation from https://en.wikipedia.org/wiki/Voigt_profile)
+    fwhm = 0.5346 * fwhm_stark + np.sqrt(0.2166 * fwhm_stark ** 2 + fwhm_doppler ** 2)
 
-    # Doppler FWHM: Gaussian
-    fwhm_gauss_hz = doppler_fwhm(n_upper, temp, mass)
-
-    # Stark FWHM: Lorentzian
-    fwhm_lorentz_hz = stark_fwhm(n_upper, dens)
-
-    # total FWHM: Voigt. approximation (https://en.wikipedia.org/wiki/Voigt_profile)
-    fwhm = 0.5346 * fwhm_lorentz_hz + np.sqrt(0.2166 * fwhm_lorentz_hz ** 2 + fwhm_gauss_hz ** 2)
-
-    return fwhm
+    return fwhm + zeeman_split
 
 
-def doppler_fwhm(n_upper, temp, mass):
+def get_fwhm_doppler(species, n_upper, n_lower, temp):
     """
     Doppler-broadened FWHM
     
@@ -128,47 +111,50 @@ def doppler_fwhm(n_upper, temp, mass):
     :return: fwhm [ Hz ]
 
     """
-
-    freq_centre = c / get_wl_centre(n_upper)
+    mass = get_species_mass(species)
+    freq_centre = c / get_wl_centre(species, n_upper, n_lower)
     temp_k = temp * e / k
     v_th = np.sqrt(2 * k * temp_k / mass)
     sigma = v_th * freq_centre / (np.sqrt(2) * c)
-    fwhm = 2 * np.sqrt(2 * np.log(2)) * sigma
+    fwhm_hz = 2 * np.sqrt(2 * np.log(2)) * sigma
 
-    return fwhm
+    return fwhm_hz
 
 
-def stark_fwhm(n_upper, dens):
+def get_fwhm_stark(species, n_upper, n_lower, e_dens):
     """
-    Griem's scaling for Stark-broadened FWHM
+    Approximate Stark-broadened FWHM using tabulated values
 
+    :param species:
     :param n_upper:
-    :param dens: [ m^-3 ]
+    :param n_lower:
+    :param e_dens: [ m^-3 ] electron density
 
     :return: fwhm [ Hz ]
     """
 
-    wavelength_centre = get_wl_centre(n_upper)
+    wl_centre = get_wl_centre(species, n_upper, n_lower)
 
-    griem_alpha_12s = {3: 0.05, 4: 0.08, 5: 0.09, 6: 0.17, 7: 0.22, 8: 0.28, 9: 0.36,
-                       10: 0.46}  # values approximate
-    alpha_12 = griem_alpha_12s[n_upper]
+    if species == 'He':
+        """
+        source: He II I' Stark broadening and intensity ratio of C IV and C III lines calibrated
+        with Thomson scattering for high-density plasma diagnostics, A. Gawran et al., phys rev. A (1988)
+        """
 
-    ne_20 = dens * 1e-20  # convert into units: 10 ** 20 m ** -3
-    fwhm_lorentz_m = 1e-9 * 0.54 * alpha_12 * ne_20 ** (2 / 3)  # Griem scaling
-    fwhm_lorentz_hz = fwhm_lorentz_m * c / wavelength_centre ** 2
+        fwhm_nm = 3.65e-20 * e_dens ** 0.826
+        fwhm_hz = fwhm_nm * 1e-9 * c / wl_centre ** 2
 
-    return fwhm_lorentz_hz
+    else:
+        griem_a12s = {3: 0.05, 4: 0.08, 5: 0.09, 6: 0.17, 7: 0.22, 8: 0.28, 9: 0.36,
+                           10: 0.46}  # values approximate
+        alpha_12 = griem_a12s[n_upper]
 
+        ne_20 = e_dens * 1e-20  # convert into units: 10 ** 20 m ** -3
+        fwhm_m = 1e-9 * 0.54 * alpha_12 * ne_20 ** (2 / 3)  # Griem scaling
+        fwhm_hz = fwhm_m * c / wl_centre ** 2
 
-def get_wl_centre(n_upper):
-    """
-    Source: NIST. These values are for deuterium, with unresolved fine-structure transitions
+    return fwhm_hz
 
-    """
-
-    assert n_upper in [3, 4, 5, 6, 7, 8]
-    return [0, 0, 0, 656.1012, 486.00013, 433.92833, 410.06186, 396.89923, 388.79902][n_upper] * 1e-9
 
 
 def get_stehle_balmer_wavelength(n_upper):
@@ -330,8 +316,9 @@ def to_precision(x, p):
     return "".join(out)
 
 
-def doppler_lineshape(x, x_centre, temp, mass, x_units='m'):
-    """ generate Doppler lineshape, area-normalised to 1. 
+def doppler_lineshape(species, x, x_centre, temp, x_units='m'):
+    """
+    generate Doppler broadened lineshape, area-normalised to 1.
     
     Assumed Maxwellian velocity distribution -- Gaussian profile.
     
@@ -341,10 +328,9 @@ def doppler_lineshape(x, x_centre, temp, mass, x_units='m'):
     :param mass: [ kg ]
     :return: 
     """
-
+    mass = get_species_mass(species)
     temp_k = temp * e / k  # temperature [ K ]
     v_th = np.sqrt(2 * k * temp_k / mass)  # thermal speed [ m/s ]
-
 
     assert x_units in valid_x_units
 
@@ -357,6 +343,45 @@ def doppler_lineshape(x, x_centre, temp, mass, x_units='m'):
     ls_d = (freq_centre ** -1) * np.sqrt((c / v_th) ** 2 / np.pi) * np.exp(- 0.5 * ((freqs - freq_centre) / sigma) ** 2)
 
     return ls_d
+
+
+def get_freq_axis(species, n_upper, n_lower, e_dens, temp, bfield, no_fwhm=6, npts=3001, wl_centre=None):
+    """
+
+    :param n_upper:
+    :param e_dens:
+    :param n_temp:
+    :param bfield:
+    :param no_fwhm:
+    :param npts:
+    :param wl_centre:
+    :return:
+    """
+
+    if wl_centre is None:
+        wl_centre = get_wl_centre(species, n_upper, n_lower)
+
+    freq_centre = c / wl_centre
+    fwhm_hz = estimate_fwhm(species, n_upper, n_lower, e_dens, temp, bfield)
+
+    return np.linspace(freq_centre - no_fwhm * fwhm_hz, freq_centre + no_fwhm * fwhm_hz, npts)
+
+
+def get_freq_axis_conv(freq_axis, extra=1000):
+    """
+    extend a uniform frequency axis for use in convolution to avoid edge effects
+
+    """
+
+    min_freq, max_freq, = np.min(freq_axis), np.max(freq_axis)
+    len_axis = len(freq_axis)
+    dfreq = abs(freq_axis[1] - freq_axis[0])
+    min_freq_conv = min_freq - extra / 2 * dfreq
+    max_freq_conv = max_freq + extra / 2 * dfreq
+    freq_axis_conv = np.linspace(min_freq_conv, max_freq_conv, len_axis + extra)
+
+    return freq_axis_conv
+
 
 
 def convert_ls_units(x, x_centre, mode='uniform', x_out=None, ls=None):
@@ -374,7 +399,6 @@ def convert_ls_units(x, x_centre, mode='uniform', x_out=None, ls=None):
     # preliminary checks
     valid_modes = ['direct', 'uniform', 'interp']
     assert mode in valid_modes
-    # print(np.min(x), x_centre, np.max(x))
     assert np.min(x) < x_centre < np.max(x)
 
     # if an output axis is supplied, activate interp mode automatically
@@ -406,3 +430,7 @@ def convert_ls_units(x, x_centre, mode='uniform', x_out=None, ls=None):
         # assert len(x) == len(ls)
         ls_out = ls[::-1] * c * x_out ** -2  # conservation of energy!
         return x_out, x_centre_out, ls_out
+
+def find_nearest_idx(array, value):
+    array = np.asarray(array)
+    return (np.abs(array - value)).argmin()
