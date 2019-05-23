@@ -1,6 +1,6 @@
 # pystark
 
-Calculate lineshapes for the hydrogen Balmer series. Four line models are implemented.
+Lineshape models for spectral emission from fusion plasma. Four line models are implemented. Not optimised!
 
 Authorship:
 
