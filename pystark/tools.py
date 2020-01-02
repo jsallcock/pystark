@@ -6,6 +6,22 @@ import math
 
 valid_x_units = ['m', 'Hz']
 
+def get_approx_griem_a12_coefficient(n_upper):
+    """
+    Griem's scaling for density with FWHM is useful for simple analytical tests. Currently only has coefficients for H
+    Balmer series.
+
+    :param species:
+    :param n_upper:
+    :param n_lower:
+    :return:
+    """
+
+    griem_a12s = {3: 0.05, 4: 0.08, 5: 0.092, 6: 0.17, 7: 0.22, 8: 0.28, 9: 0.36,
+                  10: 0.46}  # values approximate
+
+    return griem_a12s[n_upper]
+
 
 def get_wl_centre(species, n_upper, n_lower):
     """
@@ -21,16 +37,19 @@ def get_wl_centre(species, n_upper, n_lower):
     """
 
     wls_nm = {'H32': 656.279,
-           'H42': 486.135,
-           'H52': 434.0472,
-           'H62': 410.1734,
+            'H42': 486.135,
+            'H52': 434.0472,
+            'H62': 410.1734,
+            'H72': 397.0075,
 
            'D32': 656.106652,
            'D42': 486.00013,
            'D52': 433.92833,
            'D62': 410.06186,
+           'D72': 396.89923,
 
            'He43': 468.6,
+           'C00': 464.9,  # TODO fix this
            }
     key = species + str(n_upper) + str(n_lower)
     assert key in list(wls_nm.keys())
@@ -49,12 +68,13 @@ def get_species_mass(species):
             'D': 2.01410178 * atomic_mass,
             'T': 3.01604928199 * atomic_mass,
             'He': 4.002602 * atomic_mass,
+            'C': 12.0107 * atomic_mass,
             }
     assert species in list(mass.keys())
     return mass[species]
 
 
-def get_wl_axis(species, n_upper, n_lower, dens, temp, bfield, no_fwhm=15, npts=2001, wl_centre=None):
+def get_wl_axis(species, n_upper, n_lower, dens, temp, bfield, no_fwhm=40, npts=5001, wl_centre=None):
     """
     For a given species, transition and plasma, return sensible, regular wavelength axis ( m )
     
@@ -145,16 +165,12 @@ def get_fwhm_stark(species, n_upper, n_lower, e_dens):
         fwhm_hz = fwhm_nm * 1e-9 * c / wl_centre ** 2
 
     else:
-        griem_a12s = {3: 0.05, 4: 0.08, 5: 0.09, 6: 0.17, 7: 0.22, 8: 0.28, 9: 0.36,
-                           10: 0.46}  # values approximate
-        alpha_12 = griem_a12s[n_upper]
-
+        alpha_12 = get_approx_griem_a12_coefficient(n_upper)
         ne_20 = e_dens * 1e-20  # convert into units: 10 ** 20 m ** -3
         fwhm_m = 1e-9 * 0.54 * alpha_12 * ne_20 ** (2 / 3)  # Griem scaling
         fwhm_hz = fwhm_m * c / wl_centre ** 2
 
     return fwhm_hz
-
 
 
 def get_stehle_balmer_wavelength(n_upper):
@@ -345,7 +361,7 @@ def doppler_lineshape(species, x, x_centre, temp, x_units='m'):
     return ls_d
 
 
-def get_freq_axis(species, n_upper, n_lower, e_dens, temp, bfield, no_fwhm=6, npts=3001, wl_centre=None):
+def get_freq_axis(species, n_upper, n_lower, e_dens, temp, bfield, no_fwhm=8, npts=5001, wl_centre=None):
     """
 
     :param n_upper:
@@ -381,7 +397,6 @@ def get_freq_axis_conv(freq_axis, extra=1000):
     freq_axis_conv = np.linspace(min_freq_conv, max_freq_conv, len_axis + extra)
 
     return freq_axis_conv
-
 
 
 def convert_ls_units(x, x_centre, mode='uniform', x_out=None, ls=None):
@@ -430,6 +445,7 @@ def convert_ls_units(x, x_centre, mode='uniform', x_out=None, ls=None):
         # assert len(x) == len(ls)
         ls_out = ls[::-1] * c * x_out ** -2  # conservation of energy!
         return x_out, x_centre_out, ls_out
+
 
 def find_nearest_idx(array, value):
     array = np.asarray(array)

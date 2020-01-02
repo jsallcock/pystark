@@ -7,8 +7,33 @@ import scipy.signal
 import pystark
 
 
+def get_param_ranges(line_model):
+    """
+    for a specified spectral lineshape model, return the parameter ranges of validity.
+    :return:
+    """
+
+    # TODO this all seems a bit convoluted...
+    line_models = ['voigt', 'rosato', 'stehle', 'stehle_param', ]
+    n_upper_range = [(np.nan, np.nan), (3, 7), (3, 30), (3, 9)]
+    e_dens_range = [(np.nan, np.nan), (1e19, 1e22), (1e16, 1e25), (0., 1e22)]
+    temp_range = [(np.nan, np.nan), (0.32, 32), (0.22, 110), (0., 1000)]
+    b_field_range = [(np.nan, np.nan), (0, 5), (0, 5), (0, 5)]
+
+    param_ranges = list(zip(line_models, n_upper_range, e_dens_range, temp_range, b_field_range))
+    columns = ['line_model_name', 'n_upper_range', 'e_dens_range', 'temp_range', 'b_field_range']
+    param_ranges = pd.DataFrame(data=param_ranges, columns=columns)
+
+    n_upper_range = param_ranges['n_upper_range'][param_ranges['line_model_name'] == line_model].values[0]
+    e_dens_range = param_ranges['e_dens_range'][param_ranges['line_model_name'] == line_model].values[0]
+    temp_range = param_ranges['temp_range'][param_ranges['line_model_name'] == line_model].values[0]
+    b_field_range = param_ranges['b_field_range'][param_ranges['line_model_name'] == line_model].values[0]
+
+    return n_upper_range, e_dens_range, temp_range, b_field_range
+
+
 class StarkLineshape(object):
-    def __init__(self, species, n_upper, n_lower, dens, temp, bfield, viewangle=0., line_model='rosato', wl_axis=None,
+    def __init__(self, species, n_upper, n_lower, e_dens, temp, b_field, e_temp=None, view_angle=0., line_model='stehle_param', wl_axis=None,
                  wl_centre=None, npts=None, override_input_check=False):
         """
         spectral lineshape. Area-normalised to 1.
@@ -17,30 +42,41 @@ class StarkLineshape(object):
         appropriate. Only the Balmer series is currently supported, however 'stehle' and 'stehle param' models do
         support some Paschen lines so it would be easy to incorporate those should you need to. Not optimised for
         speed yet, so its probably not suitable for anything intensive.
-        
+
+        Discontinuities far in the wings of the lineshapes generated using the 'Rosato' model are **I think** due to
+        leaving the tabulated detuning axis for one of the bounds of interpolation while staying on it for the other.
+        I don't think this is a big problem.
+
+        :param species
+        :type species: str
+
         :param n_upper: upper principal quantum number of transition.
         :type n_upper: int
 
-        :param dens: density [ m^-3 ]
-        :type dens: float
+        :param n_lower: upper principal quantum number of transition.
+        :type n_upper: int
 
-        :param temp: temperature [ eV ]
+        :param e_dens: electron density [ m^-3 ]
+        :type e_dens: float
+
+        :param temp: temperature [ eV ]. It is assumed that the temperatures of the electrons and the emitting ions are
+        the same.
         :type temp: float
 
-        :param bfield: magnetic field strength [ T ]
+        :param b_field: magnetic field strength [ T ]
         :type dens: float
 
-        :param viewangle: [ rad ]
-        :type viewangle: float
+        :param e_temp: electron temperature [ eV ]. Defaults to None, in which case it is assumed that T_n = T_e.
+        :type e_temp: float
+
+        :param view_angle: [ rad ]
+        :type view_angle: float
 
         :param line_model: can be:
 
         - 'voigt':
-
         - 'rosato':
-
         - 'stehle':
-
         - 'stehle_param':
 
         :type line_model: str
@@ -59,7 +95,7 @@ class StarkLineshape(object):
         """
 
         if npts is None:
-            npts = 3001
+            npts = 2001
 
         # if no wavelength centre supplied, retrieve NIST value
         if wl_centre is None:
@@ -67,15 +103,18 @@ class StarkLineshape(object):
 
         # if no wavelength axis supplied, generate reasonable axis
         if wl_axis is None:
-            wl_axis = pystark.get_wl_axis(species, n_upper, n_lower, dens, temp, bfield, npts=npts, wl_centre=wl_centre)
+            wl_axis = pystark.get_wl_axis(species, n_upper, n_lower, e_dens, temp, b_field, npts=npts, wl_centre=wl_centre)
 
         self.species = species
         self.n_upper = n_upper
         self.n_lower = n_lower
-        self.dens = dens
+        self.e_dens = e_dens
         self.temp = temp
-        self.bfield = bfield
-        self.viewangle = viewangle
+        self.b_field = b_field
+        self.e_temp = e_temp
+        if self.e_temp is None:
+            self.e_temp = self.temp
+        self.view_angle = view_angle
         self.line_model = line_model
         self.wl_axis = wl_axis
         self.wl_centre = wl_centre
@@ -85,7 +124,7 @@ class StarkLineshape(object):
             self.input_check()
 
         # frequency axis for internal use only
-        self.freq_axis = pystark.get_freq_axis(species, n_upper, n_lower, dens, temp, bfield, no_fwhm=30, npts=self.npts, wl_centre=wl_centre)
+        self.freq_axis = pystark.get_freq_axis(species, n_upper, n_lower, e_dens, temp, b_field, no_fwhm=20, npts=self.npts, wl_centre=wl_centre)
 
         self.freq_axis_conv = pystark.get_freq_axis_conv(self.freq_axis)
         self.freq_centre = c / wl_centre
@@ -142,35 +181,17 @@ class StarkLineshape(object):
 
         """
 
-        # TODO this all seems a bit convoluted...
-
         if self.species == 'He': assert self.line_model == 'voigt'
+        n_upper_range, e_dens_range, temp_range, b_field_range = get_param_ranges(self.line_model)
 
-        line_models = ['voigt', 'rosato', 'stehle', 'stehle_param',]
-        n_upper_range = [None, (3, 7), (3, 30), (3, 9)]
-        dens_range = [None, (1e19, 1e21), (1e16, 1e25), (0., 1e22)]
-        temp_range = [None, (0.32, 32), (0.22, 110), (0., 1000)]
-        bfield_range = [None, (0, 5), (0, 5), (0, 5)]
-
-        param_ranges = list(zip(line_models, n_upper_range, dens_range, temp_range, bfield_range))
-        columns = ['line model names', 'n upper range', 'dens range', 'temp range', 'bfield range']
-        param_ranges = pd.DataFrame(data=param_ranges, columns=columns)
-
-        assert sum(param_ranges['line model names'].isin([self.line_model]))
-
-        n_upper_range = param_ranges['n upper range'][param_ranges['line model names'] == self.line_model].values[0]
-        dens_range = param_ranges['dens range'][param_ranges['line model names'] == self.line_model].values[0]
-        temp_range = param_ranges['temp range'][param_ranges['line model names'] == self.line_model].values[0]
-        bfield_range = param_ranges['bfield range'][param_ranges['line model names'] == self.line_model].values[0]
-
-        if n_upper_range is not None:
+        if np.isnan(n_upper_range).sum() <= 1:
             assert (self.n_upper in range(n_upper_range[0], n_upper_range[1]))
-        if dens_range is not None:
-            assert (dens_range[0] <= self.dens <= dens_range[1])
-        if temp_range is not None:
+        if np.isnan(e_dens_range).sum() <= 1:
+            assert (e_dens_range[0] <= self.e_dens <= e_dens_range[1])
+        if np.isnan(temp_range).sum() <= 1:
             assert (temp_range[0] <= self.temp <= temp_range[1])
-        if bfield_range is not None:
-            assert (bfield_range[0] <= self.bfield <= bfield_range[1])
+        if np.isnan(b_field_range).sum() <= 1:
+            assert (b_field_range[0] <= self.b_field <= b_field_range[1])
 
     def make_rosato(self):
         """
@@ -184,14 +205,14 @@ class StarkLineshape(object):
         """
 
         # use fwhm estimate to generate inputs to interpolation routine
-        fwhm_estimate = pystark.estimate_fwhm(self.species, self.n_upper, self.n_lower, self.dens, self.temp,
-                                              self.bfield)
-        no_fwhm = 20
+        fwhm_estimate = pystark.estimate_fwhm(self.species, self.n_upper, self.n_lower, self.e_dens, self.temp,
+                                              self.b_field)
+        no_fwhm = 12
         wmax = no_fwhm * fwhm_estimate * h / e  # [ eV ]
 
         # load interpolated Stark-Zeeman lineshape using python wrapper
-        detunings_rosato, ls_sz = pystark.rosato_wrapper(self.n_upper, self.dens, self.temp, self.bfield,
-                                                         self.viewangle, wmax, self.npts, display=False)
+        detunings_rosato, ls_sz = pystark.rosato_wrapper(self.n_upper, self.e_dens, self.temp, self.b_field,
+                                                         self.view_angle, wmax, self.npts, display=False)
 
         freqs_rosato = e * detunings_rosato / h + self.freq_centre  # [ Hz ]
         ls_sz *= h / e  # [ / Hz ]
@@ -214,7 +235,7 @@ class StarkLineshape(object):
         """
 
         hwhm_doppler = pystark.get_fwhm_doppler(self.species, self.n_upper, self.n_lower, self.temp) / 2
-        hwhm_stark = pystark.get_fwhm_stark(self.species, self.n_upper, self.n_lower, self.dens) / 2
+        hwhm_stark = pystark.get_fwhm_stark(self.species, self.n_upper, self.n_lower, self.e_dens) / 2
         sigma_doppler = hwhm_doppler / np.sqrt(2 * np.log(2))
 
         ls_sd = np.real(wofz(((self.freq_axis - self.freq_centre) + 1j * hwhm_stark) / sigma_doppler / np.sqrt(2))) / \
@@ -226,9 +247,12 @@ class StarkLineshape(object):
         return ls_szd
 
     def make_stehle_param(self):
+        """
+
+        :return:
+        """
 
         # Paramaterised MMM Stark profile coefficients from Bart's paper
-
         loman_ij_abc = {
             '32':  [0.7665, 0.064, 3.710e-18],
             '42':  [0.7803, 0.050, 8.425e-18],
@@ -247,14 +271,12 @@ class StarkLineshape(object):
 
         loman_abc = loman_ij_abc[str(self.n_upper) + str(self.n_lower)]
         a_ij, b_ij, c_ij = loman_abc
-
-        delta_lambda_12ij = c_ij * (self.dens ** a_ij) / (self.temp ** b_ij)  # nm
+        delta_lambda_12ij = c_ij * (self.e_dens ** a_ij) / (self.e_temp ** b_ij)  # nm
 
         ls_s = 1 / (abs((self.wl_axis - self.wl_centre) * 1e9) ** (5. / 2.) +
                     (delta_lambda_12ij / 2) ** (5. / 2.))
 
         ls_s /= np.trapz(ls_s, self.wl_axis)
-
         x_out, x_centre_out, ls_s = pystark.convert_ls_units(self.wl_axis, self.wl_centre, mode='interp', x_out=self.freq_axis, ls=ls_s)
 
         return ls_s
@@ -268,7 +290,7 @@ class StarkLineshape(object):
         """
 
         temp_k = self.temp * e / k  # temperature in K
-        dens_cm = self.dens * 1.e-6  # electronic density in cm-3
+        dens_cm = self.e_dens * 1.e-6  # electronic density in cm-3
         prefix = 'n_' + str(self.n_upper) + '_' + str(self.n_lower) + '_'
 
         # extract raw tabulated tabulated_data
@@ -565,7 +587,7 @@ class StarkLineshape(object):
 
         assert x_units in pystark.valid_x_units
 
-        if self.bfield == 0.:
+        if self.b_field == 0.:
             return ls
 
         if x_units == 'm':
@@ -573,9 +595,9 @@ class StarkLineshape(object):
         else:
             freqs, freq_centre = x, x_centre
 
-        rel_intensity_pi = np.sin(self.viewangle) ** 2 / 2
-        rel_intensity_sigma = 1 / 4 * (1 + np.cos(self.viewangle) ** 2)
-        freq_shift_sigma = e / (4 * np.pi * m_e) * self.bfield
+        rel_intensity_pi = np.sin(self.view_angle) ** 2 / 2
+        rel_intensity_sigma = 1 / 4 * (1 + np.cos(self.view_angle) ** 2)
+        freq_shift_sigma = e / (4 * np.pi * m_e) * self.b_field
 
         # relative intensities normalised to sum to one
 

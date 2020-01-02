@@ -9,7 +9,7 @@ sys.path.insert(0, rosato_path)
 import rosato_f90_funcs  # this is the shared object generated using the fortran subroutines in LS_DATA_read_f2py.f90
 
 
-def rosato_wrapper(n_upper, dens, temp, bfield, viewangle, wmax, npts, display=False):
+def rosato_wrapper(n_upper, dens, temp, bfield, view_angle, wmax, npts, display=False):
     """
      Stark-Zeeman lineshape profile for the first Balmer lines, interpolated from the Rosato et al. tabulated_data.
     
@@ -19,7 +19,7 @@ def rosato_wrapper(n_upper, dens, temp, bfield, viewangle, wmax, npts, display=F
     :param dens: [m^-3]
     :param temp: [eV]
     :param bfield: [T]
-    :param viewangle: [rad] 
+    :param view_angle: [rad] 
     :param wmax: [eV]
     :param npts: 
     :param display: bool.
@@ -44,7 +44,7 @@ def rosato_wrapper(n_upper, dens, temp, bfield, viewangle, wmax, npts, display=F
     iN, iT, iB = rosato_f90_funcs.set_bounds(dens_cm3, temp, bfield)
 
     viewangle_idxs = [0, 1]
-    ls = np.zeros([npts, 2])
+    lss = np.zeros([npts, 2])
 
     for i, viewangle_idx in enumerate(viewangle_idxs):
         name = rosato_f90_funcs.set_name_file(n_upper, iN, iT, iB, viewangle_idx)
@@ -55,16 +55,18 @@ def rosato_wrapper(n_upper, dens, temp, bfield, viewangle, wmax, npts, display=F
         dir = os.path.join(rosato_database_path, balmer_line_names[n_upper] + '/').encode('utf-8')
 
         w_arr, ls_arr = rosato_f90_funcs.read_file(len(dir), dir, name)
-        ls[:, i] = rosato_f90_funcs.ls_interpol(n_upper, dens_cm3, temp, bfield, wmax, npts, w_arr, ls_arr, iN, iT, iB)
+        lss[:, i] = rosato_f90_funcs.ls_interpol(n_upper, dens_cm3, temp, bfield, wmax, npts, w_arr, ls_arr, iN, iT, iB)
 
-    ls = ls[:, 0] * np.sin(viewangle) ** 2 + ls[:, 1] * np.cos(viewangle) ** 2
+    ls = lss[:, 0] * np.sin(view_angle) ** 2 + lss[:, 1] * np.cos(view_angle) ** 2
 
-    if display:
-        plt.figure()
-        plt.plot(detunings_axis, ls)
-        plt.ylabel('ls')
-        plt.xlabel('Detuning (eV)')
-        # plt.semilogy()
-        plt.show()
+    # if display:
+    #     plt.figure()
+    #     plt.plot(detunings_axis, ls)
+    #     plt.plot(detunings_axis, lss[:, 0])
+    #     plt.plot(detunings_axis, lss[:, 1])
+    #     plt.ylabel('ls')
+    #     plt.xlabel('Detuning (eV)')
+    #     # plt.semilogy()
+    #     plt.show()
 
     return detunings_axis, ls
