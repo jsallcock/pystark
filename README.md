@@ -16,8 +16,8 @@ Python 3 only.
 - scipy
 - matplotlib
 - pandas
-- f2py3.5 (used to wrap fortran90 code in python. This should come with numpy, but if there are any problems, check you are 
-able to run 'f2py3.5' from the terminal)
+- f2py (used to wrap fortran90 code in python. This comes with numpy, but if there are any problems, check you are 
+able to run 'f2py' from the terminal. When i run locally on macOS, i use the GNU Compiler Collection for the Fortran backend, which can be installed easily using homebrew: 'brew install gcc')
 
 ### Installation
 
