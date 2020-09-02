@@ -17,7 +17,7 @@ def get_approx_griem_a12_coefficient(n_upper):
     :return:
     """
 
-    griem_a12s = {3: 0.05, 4: 0.08, 5: 0.092, 6: 0.17, 7: 0.22, 8: 0.28, 9: 0.36,
+    griem_a12s = {3: 0.05, 4: 0.08, 5: 0.0922747860122222, 6: 0.17, 7: 0.22, 8: 0.28, 9: 0.36,
                   10: 0.46}  # values approximate
 
     return griem_a12s[n_upper]
@@ -167,7 +167,8 @@ def get_fwhm_stark(species, n_upper, n_lower, e_dens):
     else:
         alpha_12 = get_approx_griem_a12_coefficient(n_upper)
         ne_20 = e_dens * 1e-20  # convert into units: 10 ** 20 m ** -3
-        fwhm_m = 1e-9 * 0.54 * alpha_12 * ne_20 ** (2 / 3)  # Griem scaling
+        # fwhm_m = 1e-9 * 0.54 * alpha_12 * ne_20 ** (2 / 3)  # Griem scaling
+        fwhm_m = 1e-9 * 0.53860867250797 * alpha_12 * ne_20 ** (2 / 3)  # Griem scaling
         fwhm_hz = fwhm_m * c / wl_centre ** 2
 
     return fwhm_hz

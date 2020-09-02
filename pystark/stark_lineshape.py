@@ -211,7 +211,16 @@ class StarkLineshape(object):
         wmax = no_fwhm * fwhm_estimate * h / e  # [ eV ]
 
         # load interpolated Stark-Zeeman lineshape using python wrapper
-        detunings_rosato, ls_sz = pystark.rosato_wrapper(self.n_upper, self.e_dens, self.temp, self.b_field,
+        # this is a fudge factor for accounting for isotope effects to a first order -- since it is the thermal
+        # velocity of the ions that helps determine the Stark profile, doubling the input temperature is effectively
+        # the same as halving the mass (original results are for deuterium). This step is on the advice of J. Rosato.
+        if self.species == 'D':
+            cc = 1
+        elif self.species == 'H':
+            cc = 2
+        else:
+            raise Exception()
+        detunings_rosato, ls_sz = pystark.rosato_wrapper(self.n_upper, self.e_dens, cc * self.temp, self.b_field,
                                                          self.view_angle, wmax, self.npts, display=False)
 
         freqs_rosato = e * detunings_rosato / h + self.freq_centre  # [ Hz ]
@@ -222,7 +231,6 @@ class StarkLineshape(object):
 
         # interpolate onto class frequency grid
         ls_sz = np.interp(self.freq_axis, freqs_rosato, ls_sz)
-
         return ls_sz
 
     def make_voigt(self):
