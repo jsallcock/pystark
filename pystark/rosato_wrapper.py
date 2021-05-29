@@ -42,7 +42,6 @@ def rosato_wrapper(n_upper, dens, temp, bfield, view_angle, wmax, npts, display=
 
     # get the parameter grid bound indices
     iN, iT, iB = rosato_f90_funcs.set_bounds(dens_cm3, temp, bfield)
-
     viewangle_idxs = [0, 1]
     lss = np.zeros([npts, 2])
 
@@ -58,15 +57,5 @@ def rosato_wrapper(n_upper, dens, temp, bfield, view_angle, wmax, npts, display=
         lss[:, i] = rosato_f90_funcs.ls_interpol(n_upper, dens_cm3, temp, bfield, wmax, npts, w_arr, ls_arr, iN, iT, iB)
 
     ls = lss[:, 0] * np.sin(view_angle) ** 2 + lss[:, 1] * np.cos(view_angle) ** 2
-
-    # if display:
-    #     plt.figure()
-    #     plt.plot(detunings_axis, ls)
-    #     plt.plot(detunings_axis, lss[:, 0])
-    #     plt.plot(detunings_axis, lss[:, 1])
-    #     plt.ylabel('ls')
-    #     plt.xlabel('Detuning (eV)')
-    #     # plt.semilogy()
-    #     plt.show()
 
     return detunings_axis, ls

@@ -6,93 +6,39 @@ from scipy.constants import physical_constants, atomic_mass, c, h, e, k, m_e
 import scipy.signal
 import pystark
 
-
-def get_param_ranges(line_model):
-    """
-    for a specified spectral lineshape model, return the parameter ranges of validity.
-    :return:
-    """
-
-    # TODO this all seems a bit convoluted...
-    line_models = ['voigt', 'rosato', 'stehle', 'stehle_param', ]
-    n_upper_range = [(np.nan, np.nan), (3, 7), (3, 30), (3, 9)]
-    e_dens_range = [(np.nan, np.nan), (1e19, 1e22), (1e16, 1e25), (0., 1e22)]
-    temp_range = [(np.nan, np.nan), (0.32, 32), (0.22, 110), (0., 1000)]
-    b_field_range = [(np.nan, np.nan), (0, 5), (0, 5), (0, 5)]
-
-    param_ranges = list(zip(line_models, n_upper_range, e_dens_range, temp_range, b_field_range))
-    columns = ['line_model_name', 'n_upper_range', 'e_dens_range', 'temp_range', 'b_field_range']
-    param_ranges = pd.DataFrame(data=param_ranges, columns=columns)
-
-    n_upper_range = param_ranges['n_upper_range'][param_ranges['line_model_name'] == line_model].values[0]
-    e_dens_range = param_ranges['e_dens_range'][param_ranges['line_model_name'] == line_model].values[0]
-    temp_range = param_ranges['temp_range'][param_ranges['line_model_name'] == line_model].values[0]
-    b_field_range = param_ranges['b_field_range'][param_ranges['line_model_name'] == line_model].values[0]
-
-    return n_upper_range, e_dens_range, temp_range, b_field_range
+# TODO add option to output the full Stokes vector
 
 
 class StarkLineshape(object):
-    def __init__(self, species, n_upper, n_lower, e_dens, temp, b_field, e_temp=None, view_angle=0., line_model='stehle_param', wl_axis=None,
-                 wl_centre=None, npts=None, override_input_check=False):
-        """
-        spectral lineshape. Area-normalised to 1.
-        
-        Input / output is in wavelength space, while internal calculations are done in frequency space where possible /
-        appropriate. Only the Balmer series is currently supported, however 'stehle' and 'stehle param' models do
-        support some Paschen lines so it would be easy to incorporate those should you need to. Not optimised for
-        speed yet, so its probably not suitable for anything intensive.
+    """
+    Spectral lineshape. Area-normalised to 1.
 
-        Discontinuities far in the wings of the lineshapes generated using the 'Rosato' model are **I think** due to
-        leaving the tabulated detuning axis for one of the bounds of interpolation while staying on it for the other.
-        I don't think this is a big problem.
+    Input / output is in wavelength space, while internal calculations are done in frequency space where possible /
+    appropriate. Only the Balmer series is currently supported, however 'stehle' and 'stehle param' models do
+    support some Paschen lines so it would be easy to incorporate those should you need to. Not optimised, so its probably not suitable for anything intensive.
 
-        :param species
-        :type species: str
+    Discontinuities far in the wings of the lineshapes generated using the 'Rosato' model are **I think** due to
+    leaving the tabulated detuning axis for one of the bounds of interpolation while staying on it for the other.
+    I don't think this is a big problem.
 
-        :param n_upper: upper principal quantum number of transition.
-        :type n_upper: int
+    :param str species: Specifies emitting species e.g. 'H' for hydrogen and 'D' for deuterium.
+    :param int n_upper: Upper principal quantum number of transition.
+    :param int n_lower: Lower principal quantum number of transition.
+    :param float e_dens: Electron (number) density in units m^-3.
+    :param float temp: Temperature of the emitting ion / neutral species in units eV.
+    :param float b_field: Magnetic field strength in units T.
+    :param float e_temp: Temperature of the electrons in units eV. Defaults to None, in which case it is assumed
+        equal to 'temp'.
+    :param float view_angle: Angle between sight line and magnetic field vector in radians.
+    :param str line_model: Specifies which model to use. Can be 'voigt', 'rosato', 'stehle' or 'stehle_param'.
+    :param np.array wl_axis: Wavelengths in units m over which the lineshape is to be calculated.
+    :param float wl_centre: Manually set the wavelength, in units m, of the line centre.
+    :param int npts: Number of points in auto-generated wl_axis (if wl_axis not specified)
+    :param bool override_input_check: skip checking that the inputs lie within valid ranges - use with care
+    """
 
-        :param n_lower: upper principal quantum number of transition.
-        :type n_upper: int
-
-        :param e_dens: electron density [ m^-3 ]
-        :type e_dens: float
-
-        :param temp: temperature [ eV ]. It is assumed that the temperatures of the electrons and the emitting ions are
-        the same.
-        :type temp: float
-
-        :param b_field: magnetic field strength [ T ]
-        :type dens: float
-
-        :param e_temp: electron temperature [ eV ]. Defaults to None, in which case it is assumed that T_n = T_e.
-        :type e_temp: float
-
-        :param view_angle: [ rad ]
-        :type view_angle: float
-
-        :param line_model: can be:
-
-        - 'voigt':
-        - 'rosato':
-        - 'stehle':
-        - 'stehle_param':
-
-        :type line_model: str
-
-        :param wl_axis: [ m ]
-        :type wl_axis: np.array
-
-        :param wl_centre: [ m ]
-        :type wl_centre: float
-
-        :param npts: number of points in auto-generated wl_axis (if wl_axis not specified)
-        :type npts: int
-
-        :param override_input_check: skip checking that the inputs lie within valid ranges - use with care
-        :type override_input_check: bool
-        """
+    def __init__(self, species, n_upper, n_lower, e_dens, temp, b_field, e_temp=None, view_angle=0,
+                 line_model='stehle_param', wl_axis=None, wl_centre=None, npts=None, override_input_check=False):
 
         if npts is None:
             npts = 2001
@@ -111,9 +57,10 @@ class StarkLineshape(object):
         self.e_dens = e_dens
         self.temp = temp
         self.b_field = b_field
-        self.e_temp = e_temp
-        if self.e_temp is None:
+        if e_temp is None:
             self.e_temp = self.temp
+        else:
+            self.e_temp = e_temp
         self.view_angle = view_angle
         self.line_model = line_model
         self.wl_axis = wl_axis
@@ -124,7 +71,7 @@ class StarkLineshape(object):
             self.input_check()
 
         # frequency axis for internal use only
-        self.freq_axis = pystark.get_freq_axis(species, n_upper, n_lower, e_dens, temp, b_field, no_fwhm=20, npts=self.npts, wl_centre=wl_centre)
+        self.freq_axis = pystark.get_freq_axis(species, n_upper, n_lower, e_dens, temp, b_field, npts=self.npts, wl_centre=wl_centre)
 
         self.freq_axis_conv = pystark.get_freq_axis_conv(self.freq_axis)
         self.freq_centre = c / wl_centre
@@ -608,7 +555,6 @@ class StarkLineshape(object):
         freq_shift_sigma = e / (4 * np.pi * m_e) * self.b_field
 
         # relative intensities normalised to sum to one
-
         ls_sigma_minus = rel_intensity_sigma * np.interp(freqs + freq_shift_sigma, freqs, ls)
         ls_sigma_plus = rel_intensity_sigma * np.interp(freqs - freq_shift_sigma, freqs, ls)
         ls_pi = rel_intensity_pi * ls
@@ -627,6 +573,32 @@ class StarkLineshape(object):
 
         # plt.semilogy()
         plt.show()
+
+
+def get_param_ranges(line_model):
+    """
+    for a specified spectral lineshape model, return the parameter ranges of validity.
+    :return:
+    """
+
+    line_models = ['voigt', 'rosato', 'stehle', 'stehle_param', ]
+    n_upper_range = [(np.nan, np.nan), (3, 7), (3, 30), (3, 9)]
+    e_dens_range = [(np.nan, np.nan), (1e19, 1e22), (1e16, 1e25), (0., 1e22)]
+    temp_range = [(np.nan, np.nan), (0.32, 32), (0.22, 110), (0., 1000)]
+    b_field_range = [(np.nan, np.nan), (0, 5), (0, 5), (0, 5)]
+
+    param_ranges = list(zip(line_models, n_upper_range, e_dens_range, temp_range, b_field_range))
+    columns = ['line_model_name', 'n_upper_range', 'e_dens_range', 'temp_range', 'b_field_range']
+    param_ranges = pd.DataFrame(data=param_ranges, columns=columns)
+
+    n_upper_range = param_ranges['n_upper_range'][param_ranges['line_model_name'] == line_model].values[0]
+    e_dens_range = param_ranges['e_dens_range'][param_ranges['line_model_name'] == line_model].values[0]
+    temp_range = param_ranges['temp_range'][param_ranges['line_model_name'] == line_model].values[0]
+    b_field_range = param_ranges['b_field_range'][param_ranges['line_model_name'] == line_model].values[0]
+
+    return n_upper_range, e_dens_range, temp_range, b_field_range
+
+
 
 
 

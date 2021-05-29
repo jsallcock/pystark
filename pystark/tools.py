@@ -6,6 +6,7 @@ import math
 
 valid_x_units = ['m', 'Hz']
 
+
 def get_approx_griem_a12_coefficient(n_upper):
     """
     Griem's scaling for density with FWHM is useful for simple analytical tests. Currently only has coefficients for H
@@ -37,19 +38,19 @@ def get_wl_centre(species, n_upper, n_lower):
     """
 
     wls_nm = {'H32': 656.279,
-            'H42': 486.135,
-            'H52': 434.0472,
-            'H62': 410.1734,
-            'H72': 397.0075,
+              'H42': 486.135,
+              'H52': 434.0472,
+              'H62': 410.1734,
+              'H72': 397.0075,
 
-           'D32': 656.106652,
-           'D42': 486.00013,
-           'D52': 433.92833,
-           'D62': 410.06186,
-           'D72': 396.89923,
+              'D32': 656.106652,
+              'D42': 486.00013,
+              'D52': 433.92833,
+              'D62': 410.06186,
+              'D72': 396.89923,
 
-           'He43': 468.6,
-           'C00': 464.9,  # TODO fix this
+              'He43': 468.6,
+              'C00': 464.9,  # TODO fix this
            }
     key = species + str(n_upper) + str(n_lower)
     assert key in list(wls_nm.keys())
@@ -74,7 +75,7 @@ def get_species_mass(species):
     return mass[species]
 
 
-def get_wl_axis(species, n_upper, n_lower, dens, temp, bfield, no_fwhm=40, npts=5001, wl_centre=None):
+def get_wl_axis(species, n_upper, n_lower, dens, temp, bfield, no_fwhm=100, npts=100001, wl_centre=None):
     """
     For a given species, transition and plasma, return sensible, regular wavelength axis ( m )
     
@@ -114,7 +115,7 @@ def estimate_fwhm(species, n_upper, n_lower, e_dens, temp, bfield):
     fwhm_stark = get_fwhm_stark(species, n_upper, n_lower, e_dens)
     zeeman_split = e / (4 * np.pi * m_e) * bfield
 
-    # total FWHM: Voigt (approximation from https://en.wikipedia.org/wiki/Voigt_profile)
+    # total FWHM (Voigt approximation from https://en.wikipedia.org/wiki/Voigt_profile)
     fwhm = 0.5346 * fwhm_stark + np.sqrt(0.2166 * fwhm_stark ** 2 + fwhm_doppler ** 2)
 
     return fwhm + zeeman_split
@@ -184,7 +185,6 @@ def get_stehle_balmer_wavelength(n_upper):
     # extract raw tabulated tabulated_data
     # tab_temp_k = np.array(pystark.nc.variables[prefix + 'tempe'].tabulated_data)  # tabulated electron temperatures (K)
     olam0, = pystark.nc.variables[prefix + 'olam0'].data  # line centre wavelength (A)
-
     olam0 *= 1e-10
 
     return olam0
@@ -193,7 +193,6 @@ def get_stehle_balmer_wavelength(n_upper):
 def get_fwhm(x, y, disp=False):
     """
     given a function with a SINGLE PEAK, find the FWHM without fitting. QUICK AND DIRTY.
-
     """
 
     # normalise height
@@ -235,7 +234,9 @@ def ls_norm(ls, x, norm_type='area'):
 
 
 def FINTRP(x1, x2, x3, y1, y2, y3, x):
-    """ Interpolation routine used in Stehle calculation. """
+    """
+    Interpolation routine used in Stehle calculation.
+    """
 
     if x == x2:
         return y2
@@ -342,7 +343,6 @@ def doppler_lineshape(species, x, x_centre, temp, x_units='m'):
     :param wavelengths: [ m ]
     :param wavelength_centre: [ m ]
     :param temp: [ eV ]
-    :param mass: [ kg ]
     :return: 
     """
     mass = get_species_mass(species)
@@ -362,7 +362,7 @@ def doppler_lineshape(species, x, x_centre, temp, x_units='m'):
     return ls_d
 
 
-def get_freq_axis(species, n_upper, n_lower, e_dens, temp, bfield, no_fwhm=8, npts=5001, wl_centre=None):
+def get_freq_axis(species, n_upper, n_lower, e_dens, temp, bfield, no_fwhm=50, npts=5001, wl_centre=None):
     """
 
     :param n_upper:
